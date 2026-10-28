@@ -1039,15 +1039,18 @@ function goalHtml(){
       h+='<div class="card mute">Auto mode uses the money you log on the Made tab and the hours you log in the time tracker.</div>';
       h+=timeCardHtml(g,c);
     }
+    h+=cashFlowHtml(g,c);
   }
   else if(tab==='daily'){
     h+=dailyHtml(g,c);
+    h+=cashFlowHtml(g,c);
   }
   else if(tab==='made'){
     h+=isOut(g)?entryForm('made','Payment','Log money you paid out toward this goal.','addMade','e.g. rent, card payment','Add payment',false,false):entryForm('made','Money made','','addMade','e.g. tips, client payment','Add money made',false,false);
     h+='<div class="mute">'+(isOut(g)?'Total paid so far':'Total made so far')+': <b class="pos">'+money(c.madeTotal)+'</b> · today <b class="pos">'+money(c.madeToday)+'</b></div>';
     if(g.subs&&g.subs.length&&g.subMode==='manual'){var stH=subStats(g,c);h+='<div class="mute">Unallocated to sections: <b class="misc">'+money(Math.max(0,stH.unalloc))+'</b> <button class="ghost sm" data-a="tab" data-t="overview">Allocate</button></div>'}
     if(!isOut(g))h+=timeCardHtml(g,c);
+    h+=cashFlowHtml(g,c);
   }
   else if(tab==='spent'){
     h+=entryForm('spent','Money spent','Spending raises what you need to make. The per-day amount updates.','addSpent','e.g. gas, supplies','Add money spent',true,true);
