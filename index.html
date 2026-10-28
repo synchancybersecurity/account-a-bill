@@ -135,6 +135,7 @@ function load(){
   if(!s.profile.filing)s.profile.filing='single';
   if(s.profile.credits==null)s.profile.credits=0;
   if(!Array.isArray(s.manual))s.manual=[];
+  if(!Array.isArray(s.savings))s.savings=[];
   return s;
 }
 function idb(cb){try{var r=indexedDB.open('accountabill',1);r.onupgradeneeded=function(){r.result.createObjectStore('s')};r.onsuccess=function(){cb(r.result)}}catch(e){}}
@@ -184,8 +185,10 @@ function render(){
 function listHtml(){
   var h='<div class="brand"><i></i><b>Account-a-Bill</b></div><h1>Goals <button class="sm" data-a="new">+ New goal</button></h1>';
   var lt=view.ltab||'goals';
-  h+='<div class="tabs"><button class="sm'+(lt==='goals'?'':' ghost')+'" data-a="ltab" data-t="goals">Goals</button><button class="sm'+(lt==='relief'?'':' ghost')+'" data-a="ltab" data-t="relief">Relief</button><button class="sm'+(lt==='combined'?'':' ghost')+'" data-a="ltab" data-t="combined">Combined</button><button class="sm'+(lt==='monthly'?'':' ghost')+'" data-a="ltab" data-t="monthly">Monthly</button></div>';
-  if(lt==='relief'){
+  h+='<div class="tabs"><button class="sm'+(lt==='goals'?'':' ghost')+'" data-a="ltab" data-t="goals">Goals</button><button class="sm'+(lt==='savings'?'':' ghost')+'" data-a="ltab" data-t="savings">Savings</button><button class="sm'+(lt==='relief'?'':' ghost')+'" data-a="ltab" data-t="relief">Relief</button><button class="sm'+(lt==='combined'?'':' ghost')+'" data-a="ltab" data-t="combined">Combined</button><button class="sm'+(lt==='monthly'?'':' ghost')+'" data-a="ltab" data-t="monthly">Monthly</button></div>';
+  if(lt==='savings'){
+    return h+savingsHtml();
+  }
     return h+reliefListHtml();
   }
   if(lt==='monthly'){
@@ -838,6 +841,31 @@ function monthlyHtml(){
   return h+'<div class="btns"><button class="ghost" data-a="monthCsv">Export monthly income (CSV)</button></div>';
 }
 
+function savingsHtml(){
+  var list=state.savings||[];
+  var h='<div class="card"><h2>Savings goals</h2><div class="mute">Track money you set aside. Separate from income goals.</div>'+
+    '<div class="grid"><label>Name<input id="svName" placeholder="e.g. Emergency fund"></label>'+
+    '<label>Target ($)<input id="svTarget" type="number" inputmode="decimal" step="any" placeholder="0"></label></div>'+
+    '<div><button data-a="addSavings">Add savings goal</button></div></div>';
+  if(!list.length){
+    h+='<div class="card mute">No savings goals yet.</div>';
+  }else{
+    var total=0, saved=0;
+    list.forEach(function(s){total+=s.target||0;saved+=s.saved||0});
+    h+='<div class="card"><div class="grid"><div><div class="mute">Total target</div><b>'+money(total)+'</b></div><div><div class="mute">Saved so far</div><b class="pos">'+money(saved)+'</b></div></div></div>';
+    list.forEach(function(s){
+      var pct=s.target>0?Math.min(100,Math.round((s.saved||0)/s.target*100)):0;
+      h+='<div class="card"><div class="row"><h2>'+esc(s.name)+'</h2><span class="mute">'+pct+'%</span></div>'+
+        '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+        '<div class="mute">'+money(s.saved||0)+' of '+money(s.target)+'</div>'+
+        '<div class="grid" style="margin-top:8px"><label>Add ($)<input id="svAdd'+s.id+'" type="number" inputmode="decimal" step="any" placeholder="0"></label>'+
+        '<div style="display:flex;align-items:flex-end;gap:6px"><button class="sm" data-a="addToSavings" data-id="'+esc(s.id)+'">Add</button>'+
+        '<button class="danger sm" data-a="delSavings" data-id="'+esc(s.id)+'">'+(view.armed==='sv'+s.id?'Confirm':'Delete')+'</button></div></div></div>';
+    });
+  }
+  return h;
+}
+
 function reliefListHtml(){
   if(!state.goals.length)return '<div class="card mute">No goals yet. Add a goal to see financial projections.</div>';
   var totalNeed=0, totalMade=0, totalRem=0, totalDays=0, goals=0;
@@ -1470,6 +1498,35 @@ document.addEventListener('click',function(ev){
     try{
       navigator.clipboard.writeText(text).then(function(){toast('Plan copied to clipboard')},function(){toast('Could not copy. Select and copy manually.')});
     }catch(e){toast('Could not copy on this device.')}
+  }
+  else if(a==='addSavings'){
+    var name=val('svName').trim(), target=num('svTarget');
+    if(!name||target==null||target<=0){toast('Enter a name and target above zero.');return}
+    if(!state.savings)state.savings=[];
+    state.savings.push({id:uid(),name:name,target:target,saved:0});
+    save();
+    toast('Savings goal added');
+    render();
+  }
+  else if(a==='addToSavings'){
+    var amt=num('svAdd'+el.dataset.id);
+    if(amt==null||amt<=0){toast('Enter an amount above zero.');return}
+    var sv=null;
+    for(var i=0;i<state.savings.length;i++)if(state.savings[i].id===el.dataset.id){sv=state.savings[i];break}
+    if(!sv)return;
+    sv.saved=(sv.saved||0)+amt;
+    save();
+    toast('Added '+money(amt));
+    render();
+  }
+  else if(a==='delSavings'){
+    var key='sv'+el.dataset.id;
+    if(view.armed!==key){view.armed=key;render();return}
+    state.savings=state.savings.filter(function(s){return s.id!==el.dataset.id});
+    view.armed=null;
+    save();
+    toast('Savings goal deleted');
+    render();
   }
   else if(a==='ltab'){view.ltab=el.dataset.t;render()}
   else if(a==='tab'){view.tab=el.dataset.t;view.armed=null;view.editing=null;render()}
