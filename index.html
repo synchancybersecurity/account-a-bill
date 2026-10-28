@@ -347,8 +347,35 @@ function stopTimer(){
 }
 function sumHours(arr){return (arr||[]).reduce(function(t,x){return t+(x.hours||0)},0)}
 function dayHours(g,d){var t=0;(g.time||[]).forEach(function(e){if(e.date===d)t+=e.hours||0});return t}
+function bestRate(g,c){
+  var avg=avgPayPerHour(g);
+  var hours=sumHours(g.time);
+  var fromLogs=hours>0?c.madeTotal/hours:0;
+  var rate=0, source='none';
+  if((g.wage||0)>0){rate=g.wage;source='manual wage'}
+  else if(avg.rate>0){rate=avg.rate;source=avg.mode==='baseline'?'baseline':'avg'}
+  else if(fromLogs>0){rate=fromLogs;source='logs'}
+  else if((g.baselinePay||0)>0){rate=g.baselinePay;source='baseline'}
+  var hpd=(g.hoursPerDay||0)>0?g.hoursPerDay:(g.baselineHours||0);
+  return {rate:rate, source:source, hoursPerDay:hpd, avg:avg, fromLogs:fromLogs};
+}
 function avgPayPerHour(g){
   if(g.payMode==='manual' && g.baselinePay>0){
+    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline'};
+  }
+  var byDay={};
+  (g.made||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].pay+=e.amount});
+  (g.time||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].hours+=e.hours||0});
+  var totalPay=0, totalHours=0, days=0;
+  Object.keys(byDay).forEach(function(d){
+    var x=byDay[d];
+    if(x.hours>0 && x.pay>0){totalPay+=x.pay;totalHours+=x.hours;days++}
+  });
+  if(days===0 && g.baselinePay>0){
+    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline'};
+  }
+  return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours, mode:'auto'};
+}
     return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline'};
   }
   var byDay={};
@@ -829,9 +856,8 @@ function reliefListHtml(){
     totalMade+=c.madeTotal;
     totalRem+=Math.max(0,c.remaining);
     totalDays+=c.daysLeft;
-    var hours=sumHours(g.time);
-    var rate=hours>0?c.madeTotal/hours:(g.wage||0);
-    rows+='<div class="item"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(Math.max(0,c.remaining))+' left · '+c.daysLeft+' days · '+(rate>0?money(rate)+'/hr':'no rate')+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
+    var br=bestRate(g,c);
+    rows+='<div class="item"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(Math.max(0,c.remaining))+' left · '+c.daysLeft+' days · '+(br.rate>0?money(br.rate)+'/hr ('+br.source+')':'no rate')+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
   });
   if(!goals)return '<div class="card mute">No incoming goals to project. Outgoing goals are excluded from relief projections.</div>';
   var avgDays=goals?Math.round(totalDays/goals):0;
@@ -917,19 +943,20 @@ function goalHtml(){
        '<div><div class="mute">Still to make</div><b>'+money(Math.max(0,c.remaining))+'</b></div>'+
      '</div>'+
      '</div>';
-    var avg=avgPayPerHour(g);
-    var hours=sumHours(g.time);
-    var effectiveRate=hours>0?c.madeTotal/hours:0;
-    var useRate=(g.wage||0)>0?g.wage:avg.rate||effectiveRate;
+    var br=bestRate(g,c);
     h+='<div class="card"><h2>Hourly wage</h2>'+
       '<div class="grid">'+
-      '<div><div class="mute">Avg $/hr</div><b class="'+(avg.rate>0?'pos':'')+'">'+(avg.days>0?money(avg.rate):'—')+'</b><div class="mute">'+(avg.mode==='manual'?'Manual':'Auto')+' · '+avg.days+' day'+(avg.days!==1?'s':'')+'</div></div>'+
-      '<div><div class="mute">Overall $/hr</div><b class="'+(effectiveRate>0?'pos':'')+'">'+(hours>0?money(effectiveRate):'—')+'</b></div>'+
-      '<div><div class="mute">Manual wage</div><b>'+(g.wage?money(g.wage):'—')+'</b></div>'+
-      '<div><div class="mute">Hours needed</div><b>'+(useRate>0?(Math.max(0,c.remaining)/useRate).toFixed(1)+' h':'—')+'</b></div>'+
-      '</div>'+
-      '<div class="mute">Open the <b>Pay</b> tab to switch Auto/Manual or edit wage and hours.</div>'+
+      '<div><div class="mute">Best rate</div><b class="'+(br.rate>0?'pos':'')+'">'+(br.rate>0?money(br.rate)+'/hr':'—')+'</b><div class="mute">'+br.source+'</div></div>'+
+      '<div><div class="mute">Hours / day</div><b>'+(br.hoursPerDay>0?br.hoursPerDay.toFixed(1):'—')+'</b></div>'+
+      '<div><div class="mute">Est. daily pay</div><b class="pos">'+(br.rate>0&&br.hoursPerDay>0?money(br.rate*br.hoursPerDay):'—')+'</b></div>'+
+      '<div><div class="mute">Hours needed</div><b>'+(br.rate>0?(Math.max(0,c.remaining)/br.rate).toFixed(1)+' h':'—')+'</b></div>'+
       '</div>';
+    if(br.rate>0 && br.hoursPerDay>0 && c.remaining>0){
+      var daysNeed=Math.ceil((Math.max(0,c.remaining)/br.rate)/br.hoursPerDay);
+      h+='<div class="sum"><span>Days to finish at this rate</span><b>'+daysNeed+'</b></div>'+
+        '<div class="mute">'+(daysNeed<=c.daysLeft?'Fits within remaining days.':'Needs more days than currently left.')+'</div>';
+    }
+    h+='<div class="mute">Set baseline on the <b>Pay</b> tab or a manual wage on <b>Relief</b>.</div></div>';
     h+=cashFlowHtml(g,c);
     if(!isOut(g))h+=timeCardHtml(g,c);
     h+=sectionsHtml(g,c);
@@ -937,38 +964,27 @@ function goalHtml(){
     h+='<div class="btns"><button class="ghost sm" data-a="edit">Edit goal</button><button class="ghost sm" data-a="dupGoal">Duplicate for next period</button><button class="danger sm" data-a="delGoal">'+(gd?'Tap to confirm delete':'Delete goal')+'</button></div>';
   }
   else if(tab==='relief'){
-    var hours=sumHours(g.time);
-    var effectiveRate=hours>0?c.madeTotal/hours:0;
-    var manualWage=g.wage||0;
-    var hpd=g.hoursPerDay||0;
-    var useRate=manualWage>0?manualWage:effectiveRate;
-    h+='<div class="card"><h2>Relief / Cash flow</h2><div class="mute">Estimated financial projections using money made, logged hours, and optional manual wage.</div></div>';
+    var br=bestRate(g,c);
+    h+='<div class="card"><h2>Relief / Cash flow</h2><div class="mute">Projections use the best available rate: '+br.source+'.</div></div>';
     h+=cashFlowHtml(g,c);
     h+='<div class="card"><h2>Hourly & daily estimates</h2>'+
       '<div class="grid">'+
-      '<div><div class="mute">Effective $/hr (from logs)</div><b class="'+(effectiveRate>0?'pos':'')+'">'+(hours>0?money(effectiveRate):'—')+'</b></div>'+
-      '<div><div class="mute">Total hours logged</div><b>'+hours.toFixed(2)+'</b></div>'+
-      '</div>'+
-      '<div class="grid" style="margin-top:10px">'+
-      '<label>Manual wage ($/hr)<input id="wageIn" type="number" inputmode="decimal" step="any" placeholder="e.g. 25" value="'+(manualWage||'')+'"></label>'+
-      '<label>Avg hours per day<input id="hpdIn" type="number" inputmode="decimal" step="any" placeholder="e.g. 6" value="'+(hpd||'')+'"></label>'+
-      '</div>'+
-      '<div class="btns" style="margin-top:8px"><button class="sm" data-a="saveWage">Save wage & hours</button></div>';
-    if(useRate>0){
-      var rem=Math.max(0,c.remaining);
-      var hoursNeeded=rem/useRate;
-      var daysAtHours=hpd>0?Math.ceil(hoursNeeded/hpd):null;
-      h+='<div class="sum"><span>Using '+(manualWage>0?'manual':'effective')+' rate of '+money(useRate)+'/hr</span><b>'+hoursNeeded.toFixed(1)+' hrs needed</b></div>';
-      if(daysAtHours!=null){
-        h+='<div class="sum"><span>At '+hpd+' hrs/day</span><b>'+daysAtHours+' day'+(daysAtHours!==1?'s':'')+'</b></div>'+
-          '<div class="mute">'+(daysAtHours<=c.daysLeft?'Fits within the remaining days.':'Needs more days than currently left.')+'</div>';
-      }else{
-        h+='<div class="mute">Enter average hours per day to estimate calendar days.</div>';
-      }
-    }else{
-      h+='<div class="mute">Log some hours or enter a manual wage to see hour-based projections.</div>';
+      '<div><div class="mute">Best rate</div><b class="'+(br.rate>0?'pos':'')+'">'+(br.rate>0?money(br.rate)+'/hr':'—')+'</b><div class="mute">'+br.source+'</div></div>'+
+      '<div><div class="mute">Hours / day</div><b>'+(br.hoursPerDay>0?br.hoursPerDay.toFixed(1):'—')+'</b></div>'+
+      '<div><div class="mute">Est. daily pay</div><b class="pos">'+(br.rate>0&&br.hoursPerDay>0?money(br.rate*br.hoursPerDay):'—')+'</b></div>'+
+      '<div><div class="mute">Hours needed</div><b>'+(br.rate>0?(Math.max(0,c.remaining)/br.rate).toFixed(1)+' h':'—')+'</b></div>'+
+      '</div>';
+    if(br.rate>0 && br.hoursPerDay>0 && c.remaining>0){
+      var daysNeed=Math.ceil((Math.max(0,c.remaining)/br.rate)/br.hoursPerDay);
+      h+='<div class="sum"><span>Days to finish at this rate</span><b>'+daysNeed+'</b></div>'+
+        '<div class="mute">'+(daysNeed<=c.daysLeft?'Fits within remaining days.':'Needs more days than currently left.')+'</div>';
     }
-    h+='</div>';
+    h+='<div class="grid" style="margin-top:10px">'+
+      '<label>Manual wage ($/hr)<input id="wageIn" type="number" inputmode="decimal" step="any" placeholder="e.g. 25" value="'+(g.wage||'')+'"></label>'+
+      '<label>Avg hours per day<input id="hpdIn" type="number" inputmode="decimal" step="any" placeholder="e.g. 6" value="'+(g.hoursPerDay||'')+'"></label>'+
+      '</div>'+
+      '<div class="btns" style="margin-top:8px"><button class="sm" data-a="saveWage">Save wage & hours</button></div>'+
+      '</div>';
     if(!isOut(g))h+=timeCardHtml(g,c);
   }
   else if(tab==='pay'){
