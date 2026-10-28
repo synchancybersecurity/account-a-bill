@@ -348,12 +348,8 @@ function stopTimer(){
 function sumHours(arr){return (arr||[]).reduce(function(t,x){return t+(x.hours||0)},0)}
 function dayHours(g,d){var t=0;(g.time||[]).forEach(function(e){if(e.date===d)t+=e.hours||0});return t}
 function avgPayPerHour(g){
-  if(g.payMode==='manual' && g.manualPay && g.manualPay.length){
-    var totalPay=0, totalHours=0, days=0;
-    g.manualPay.forEach(function(e){
-      if(e.hours>0 && e.pay>=0){totalPay+=e.pay;totalHours+=e.hours;days++}
-    });
-    return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours, mode:'manual'};
+  if(g.payMode==='manual' && g.baselinePay && g.baselineHours>0){
+    return {rate:g.baselinePay/g.baselineHours, days:1, totalPay:g.baselinePay, totalHours:g.baselineHours, mode:'baseline'};
   }
   var byDay={};
   (g.made||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].pay+=e.amount});
@@ -363,6 +359,9 @@ function avgPayPerHour(g){
     var x=byDay[d];
     if(x.hours>0 && x.pay>0){totalPay+=x.pay;totalHours+=x.hours;days++}
   });
+  if(days===0 && g.baselinePay && g.baselineHours>0){
+    return {rate:g.baselinePay/g.baselineHours, days:1, totalPay:g.baselinePay, totalHours:g.baselineHours, mode:'baseline'};
+  }
   return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours, mode:'auto'};
 }
 var EITC=[{ri:.0765,max:664,ps:10860,pm:18140,ro:.0765},{ri:.34,max:4427,ps:23890,pm:31160,ro:.1598},{ri:.40,max:7316,ps:23890,pm:31160,ro:.2106},{ri:.45,max:8231,ps:23890,pm:31160,ro:.2106}];
@@ -977,23 +976,17 @@ function goalHtml(){
     h+='<div class="card"><h2>Pay & hours mode</h2>'+
       '<div class="tabs"><button class="sm'+(mode==='auto'?'':' ghost')+'" data-a="payMode" data-m="auto">Auto</button>'+
       '<button class="sm'+(mode==='manual'?'':' ghost')+'" data-a="payMode" data-m="manual">Manual</button></div>'+
-      '<div class="mute">'+(mode==='auto'?'Using logged money made and hours.':'Using manual daily pay and hours entries.')+'</div></div>';
+      '<div class="mute">'+(mode==='auto'?'Using logged money made and hours. Falls back to baseline if none.':'Baseline pay and hours used for estimates when no auto data exists.')+'</div></div>';
     if(mode==='manual'){
-      h+='<div class="card"><h2>Add daily pay & hours</h2>'+
-        '<div class="grid"><label>Pay ($)<input id="mpPay" type="number" inputmode="decimal" step="any" placeholder="0"></label>'+
-        '<label>Hours<input id="mpHours" type="number" inputmode="decimal" step="any" placeholder="0"></label></div>'+
-        '<label>Date<input id="mpDate" type="date" value="'+today()+'"></label>'+
-        '<div><button data-a="addManualPay">Add day</button></div></div>';
-      var list=(g.manualPay||[]).slice().sort(function(a,b){return a.date<b.date?1:-1});
-      if(list.length){
-        h+='<div class="card"><h2>Manual entries</h2>';
-        list.slice(0,20).forEach(function(e){
-          var r=e.hours>0?e.pay/e.hours:0;
-          h+='<div class="item"><div><b>'+money(e.pay)+'</b> · '+e.hours.toFixed(2)+' h<div class="mute">'+esc(fmtLong(e.date))+(r>0?' · '+money(r)+'/hr':'')+'</div></div>'+
-            '<button class="danger sm" data-a="delManualPay" data-id="'+esc(e.id)+'">'+(view.armed==='mp'+e.id?'Tap to confirm':'Delete')+'</button></div>';
-        });
-        h+='</div>';
+      h+='<div class="card"><h2>Baseline estimate</h2><div class="mute">Used when there is no logged pay or hours for automatic calculation.</div>'+
+        '<div class="grid"><label>Pay ($)<input id="mpPay" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(g.baselinePay||'')+'"></label>'+
+        '<label>Hours<input id="mpHours" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(g.baselineHours||'')+'"></label></div>'+
+        '<div><button data-a="saveBaseline">Save baseline</button></div>';
+      if(g.baselinePay && g.baselineHours){
+        var br=g.baselineHours>0?g.baselinePay/g.baselineHours:0;
+        h+='<div class="sum"><span>Baseline rate</span><b class="pos">'+money(br)+'/hr</b></div>';
       }
+      h+='</div>';
     }else{
       h+='<div class="card mute">Auto mode uses the money you log on the Made tab and the hours you log in the time tracker.</div>';
       h+=timeCardHtml(g,c);
@@ -1308,6 +1301,15 @@ document.addEventListener('click',function(ev){
     g.payMode=el.dataset.m||'auto';
     save();
     toast(g.payMode==='auto'?'Auto mode':'Manual mode');
+    render();
+  }
+  else if(a==='saveBaseline'){
+    var pay=num('mpPay'), hrs=num('mpHours');
+    if(pay==null||pay<0||hrs==null||hrs<=0){toast('Enter pay and hours above zero.');return}
+    g.baselinePay=pay;
+    g.baselineHours=hrs;
+    save();
+    toast('Baseline saved');
     render();
   }
   else if(a==='addManualPay'){
