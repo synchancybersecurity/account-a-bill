@@ -173,8 +173,12 @@ function calc(g){
   var totalDays=Math.max(1,daysBetween(g.start,g.end)+1);
   var perDay=Math.max(0,(need-madeTotal)/daysLeft);
   var dayLeft=Math.max(0,Math.max(0,(need-(madeTotal-madeToday))/daysLeft)-madeToday);
+  var br=bestRate(g,{madeTotal:madeTotal,need:need,daysLeft:daysLeft,totalDays:totalDays});
+  var projected=br.rate>0&&br.hoursPerDay>0?madeTotal+(br.rate*br.hoursPerDay*daysLeft):madeTotal;
+  var gross=projected;
+  var surplus=Math.max(0,gross-need);
   return {dayLeft:dayLeft,taxOnlyTotal:taxOnlyTotal,taxTotal:taxTotal,madeTotal:madeTotal,spentTotal:spentTotal,miscTotal:miscTotal,madeToday:madeToday,need:need,remaining:need-madeTotal,
-    surplus:Math.max(0,madeTotal-need),gross:madeTotal+spentTotal+miscTotal,
+    surplus:surplus,gross:gross,
     daysLeft:daysLeft,totalDays:totalDays,dailyNeed:need/totalDays,perDay:perDay,leftToday:perDay,
     pct:need>0?Math.min(100,Math.max(0,madeTotal/need*100)):0,over:daysBetween(t,g.end)<0};
 }
@@ -541,9 +545,9 @@ function cashFlowHtml(g,c){ /* fixed */
   var h='<div class="card"><h2>Cash flow estimator</h2><div class="mute">Uses calculated hourly rate, recent average, and scenarios. Rough planning tool, not a forecast.</div>'+
     cashFlowChart(g,c,hourlyDaily>0?hourlyDaily:avgSoFar)+
     '<div class="grid">'+
-    '<div><div class="mute">Gross (incl. surplus)</div><b>'+money(c.gross)+'</b><div class="mute">Made + expenses</div></div>'+
+    '<div><div class="mute">Gross</div><b>'+money(c.gross)+'</b><div class="mute">Total that will be made</div></div>'+
     '<div><div class="mute">Goal needed</div><b>'+money(c.need)+'</b><div class="mute">'+money(g.target)+' + expenses</div></div>'+
-    '<div><div class="mute">Remaining surplus</div><b class="pos">'+money(c.surplus)+'</b></div>'+
+    '<div><div class="mute">Surplus</div><b class="pos">'+money(c.surplus)+'</b><div class="mute">After goal</div></div>'+
     '<div><div class="mute">Still to make</div><b>'+money(rem)+'</b></div>'+
     '<div><div class="mute">Days left (incl. today)</div><b>'+days+'</b></div>'+
     '<div><div class="mute">Required per day</div><b class="'+(per>0?'':'pos')+'">'+money(per)+'</b></div>'+
@@ -948,9 +952,9 @@ function reliefListHtml(){
     '<div><div class="mute">Total still to make</div><b>'+money(totalRem)+'</b></div>'+
     '<div><div class="mute">Total needed</div><b>'+money(totalNeed)+'</b></div>'+
     '<div><div class="mute">Total made so far</div><b class="pos">'+money(totalMade)+'</b></div>'+
-    '<div><div class="mute">Gross (incl. surplus)</div><b>'+money(totalGross)+'</b></div>'+
+    '<div><div class="mute">Gross</div><b>'+money(totalGross)+'</b></div>'+
     '<div><div class="mute">Goal needed</div><b>'+money(totalNeed)+'</b></div>'+
-    '<div><div class="mute">Remaining surplus</div><b class="pos">'+money(totalSurplus)+'</b></div>'+
+    '<div><div class="mute">Surplus</div><b class="pos">'+money(totalSurplus)+'</b></div>'+
     '<div><div class="mute">Goals</div><b>'+goals+'</b></div>'+
     '<div><div class="mute">Avg days left</div><b>'+avgDays+'</b></div>'+
     '</div></div>';
@@ -980,9 +984,9 @@ function combinedHtml(){
     '<div><div class="mute">Spent so far</div><b class="neg">'+money(sp)+'</b></div>'+
     '<div><div class="mute">Misc expenses</div><b class="misc">'+money(mi)+'</b></div>'+
     '<div><div class="mute">Tax deductible</div><b class="pos">'+money(tx)+'</b></div>'+
-    '<div><div class="mute">Gross (incl. surplus)</div><b>'+money(gross)+'</b><div class="mute">Made + expenses</div></div>'+
+    '<div><div class="mute">Gross</div><b>'+money(gross)+'</b><div class="mute">Total that will be made</div></div>'+
     '<div><div class="mute">Goal needed</div><b>'+money(need)+'</b></div>'+
-    '<div><div class="mute">Remaining surplus</div><b class="pos">'+money(surplus)+'</b></div>'+
+    '<div><div class="mute">Surplus</div><b class="pos">'+money(surplus)+'</b><div class="mute">After goal</div></div>'+
     '<div><div class="mute">Made today</div><b class="pos">'+money(madeToday)+'</b></div></div></div>';
   h+='<div class="card"><h2>By goal</h2>'+rows+'</div>';
   if(og.length){
@@ -1030,9 +1034,9 @@ function goalHtml(){
        '<div><div class="mute">Spent so far</div><b class="neg">'+money(c.spentTotal)+'</b></div>'+
        '<div><div class="mute">Misc expenses</div><b class="misc">'+money(c.miscTotal)+'</b></div>'+
        '<div><div class="mute">Tax deductible</div><b class="pos">'+money(c.taxTotal)+'</b><div class="mute">incl. '+money(c.taxOnlyTotal)+' tax-only</div></div>'+
-       '<div><div class="mute">Gross (incl. surplus)</div><b>'+money(c.gross)+'</b><div class="mute">Made + expenses</div></div>'+
+       '<div><div class="mute">Gross</div><b>'+money(c.gross)+'</b><div class="mute">Total that will be made</div></div>'+
        '<div><div class="mute">Goal needed</div><b>'+money(c.need)+'</b><div class="mute">'+money(g.target)+' + expenses</div></div>'+
-       '<div><div class="mute">Remaining surplus</div><b class="pos">'+money(c.surplus)+'</b></div>'+
+       '<div><div class="mute">Surplus</div><b class="pos">'+money(c.surplus)+'</b><div class="mute">After goal</div></div>'+
        '<div><div class="mute">Needed per day</div><b>'+money(c.dailyNeed)+'</b><div class="mute">'+money(c.need)+' over '+c.totalDays+' days</div></div>'+
        '<div><div class="mute">Made today</div><b class="pos">'+money(c.madeToday)+'</b><div class="mute">'+money(c.dayLeft)+' left to make today</div></div>'+
        '<div><div class="mute">Still to make</div><b>'+money(Math.max(0,c.remaining))+'</b></div>'+
