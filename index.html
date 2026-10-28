@@ -190,7 +190,7 @@ function listHtml(){
     if(!state.goals.length)return h+'<div class="card mute">No goals yet. Add a goal to see combined totals.</div>';
     return h+combinedHtml();
   }
-  if(!state.goals.length)h+='<div class="card mute">No goals yet. Tap “+ New goal”, enter how much you want to make and by when. Then log what you make and what you spend each day.</div>';
+  if(!state.goals.length)h+='<div class="card mute">No goals yet. Tap “+ New goal”, enter how much you want to make and by when. Then open the goal and use the Relief tab for cash-flow projections, hourly wage, and hours-per-day estimates.</div>';
   state.goals.forEach(function(g){
     var c=calc(g);
     h+='<div class="card tap" data-a="open" data-id="'+esc(g.id)+'"><div class="row"><h2>'+esc(g.name)+(isOut(g)?'<span class="tag" style="color:#ffb347;border-color:#ffb347">Outgoing</span>':'')+'</h2><span class="mute">'+dueShort(g)+'</span></div>'+
@@ -836,6 +836,9 @@ function goalHtml(){
   var tabs=[['overview','Overview'],['relief','Relief'],['daily','Daily'],['made','Made'],['spent','Spent'],['misc','Misc'],['taxonly','Tax'],['history','History']];
   if(isOut(g))tabs=[['overview','Overview'],['relief','Relief'],['daily','Daily'],['made','Payments'],['history','History']];
   h+='<div class="tabs noprint">'+tabs.map(function(x){return '<button class="sm'+(tab===x[0]?'':' ghost')+'" data-a="tab" data-t="'+x[0]+'">'+x[1]+'</button>'}).join('')+'</div>';
+  if(tab==='overview' && !isOut(g)){
+    h+='<div class="card" style="padding:10px 14px"><div class="mute">Open the <b>Relief</b> tab for cash-flow projections, hourly wage, and hours-per-day estimates.</div></div>';
+  }
 
   if(tab==='overview'){
     var dl=daysBetween(today(),g.end);
