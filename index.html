@@ -126,6 +126,8 @@ function load(){
     if(!g.taxpay)g.taxpay=[];
     if(!g.subs)g.subs=[];
     if(!g.time)g.time=[];
+    if(g.wage==null)g.wage=0;
+    if(g.hoursPerDay==null)g.hoursPerDay=0;
   });
   if(!s.profile)s.profile={name:'',payer:''};
   if(!s.profile.filing)s.profile.filing='single';
@@ -860,8 +862,39 @@ function goalHtml(){
     h+='<div class="btns"><button class="ghost sm" data-a="edit">Edit goal</button><button class="ghost sm" data-a="dupGoal">Duplicate for next period</button><button class="danger sm" data-a="delGoal">'+(gd?'Tap to confirm delete':'Delete goal')+'</button></div>';
   }
   else if(tab==='relief'){
-    h+='<div class="card"><h2>Relief / Cash flow</h2><div class="mute">Estimated financial projections for this goal.</div></div>';
+    var hours=sumHours(g.time);
+    var effectiveRate=hours>0?c.madeTotal/hours:0;
+    var manualWage=g.wage||0;
+    var hpd=g.hoursPerDay||0;
+    var useRate=manualWage>0?manualWage:effectiveRate;
+    h+='<div class="card"><h2>Relief / Cash flow</h2><div class="mute">Estimated financial projections using money made, logged hours, and optional manual wage.</div></div>';
     h+=cashFlowHtml(g,c);
+    h+='<div class="card"><h2>Hourly & daily estimates</h2>'+
+      '<div class="grid">'+
+      '<div><div class="mute">Effective $/hr (from logs)</div><b class="'+(effectiveRate>0?'pos':'')+'">'+(hours>0?money(effectiveRate):'—')+'</b></div>'+
+      '<div><div class="mute">Total hours logged</div><b>'+hours.toFixed(2)+'</b></div>'+
+      '</div>'+
+      '<div class="grid" style="margin-top:10px">'+
+      '<label>Manual wage ($/hr)<input id="wageIn" type="number" inputmode="decimal" step="any" placeholder="e.g. 25" value="'+(manualWage||'')+'"></label>'+
+      '<label>Avg hours per day<input id="hpdIn" type="number" inputmode="decimal" step="any" placeholder="e.g. 6" value="'+(hpd||'')+'"></label>'+
+      '</div>'+
+      '<div class="btns" style="margin-top:8px"><button class="sm" data-a="saveWage">Save wage & hours</button></div>';
+    if(useRate>0){
+      var rem=Math.max(0,c.remaining);
+      var hoursNeeded=rem/useRate;
+      var daysAtHours=hpd>0?Math.ceil(hoursNeeded/hpd):null;
+      h+='<div class="sum"><span>Using '+(manualWage>0?'manual':'effective')+' rate of '+money(useRate)+'/hr</span><b>'+hoursNeeded.toFixed(1)+' hrs needed</b></div>';
+      if(daysAtHours!=null){
+        h+='<div class="sum"><span>At '+hpd+' hrs/day</span><b>'+daysAtHours+' day'+(daysAtHours!==1?'s':'')+'</b></div>'+
+          '<div class="mute">'+(daysAtHours<=c.daysLeft?'Fits within the remaining days.':'Needs more days than currently left.')+'</div>';
+      }else{
+        h+='<div class="mute">Enter average hours per day to estimate calendar days.</div>';
+      }
+    }else{
+      h+='<div class="mute">Log some hours or enter a manual wage to see hour-based projections.</div>';
+    }
+    h+='</div>';
+    if(!isOut(g))h+=timeCardHtml(g,c);
   }
   else if(tab==='daily'){
     h+=dailyHtml(g,c);
@@ -1167,6 +1200,16 @@ document.addEventListener('click',function(ev){
   }
   else if(a==='stopGps'){
     stopGpsTrip();
+  }
+  else if(a==='saveWage'){
+    var w=num('wageIn'), h=num('hpdIn');
+    if(w==null)w=0;
+    if(h==null)h=0;
+    g.wage=w;
+    g.hoursPerDay=h;
+    save();
+    toast('Wage and hours saved');
+    render();
   }
   else if(a==='cfCalc'){
     var rate=num('cfRate');
