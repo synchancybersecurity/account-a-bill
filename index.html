@@ -541,6 +541,9 @@ function cashFlowHtml(g,c){ /* fixed */
   var h='<div class="card"><h2>Cash flow estimator</h2><div class="mute">Uses calculated hourly rate, recent average, and scenarios. Rough planning tool, not a forecast.</div>'+
     cashFlowChart(g,c,hourlyDaily>0?hourlyDaily:avgSoFar)+
     '<div class="grid">'+
+    '<div><div class="mute">Gross (incl. surplus)</div><b>'+money(c.gross)+'</b><div class="mute">Made + expenses</div></div>'+
+    '<div><div class="mute">Goal needed</div><b>'+money(c.need)+'</b><div class="mute">'+money(g.target)+' + expenses</div></div>'+
+    '<div><div class="mute">Remaining surplus</div><b class="pos">'+money(c.surplus)+'</b></div>'+
     '<div><div class="mute">Still to make</div><b>'+money(rem)+'</b></div>'+
     '<div><div class="mute">Days left (incl. today)</div><b>'+days+'</b></div>'+
     '<div><div class="mute">Required per day</div><b class="'+(per>0?'':'pos')+'">'+money(per)+'</b></div>'+
@@ -945,8 +948,9 @@ function reliefListHtml(){
     '<div><div class="mute">Total still to make</div><b>'+money(totalRem)+'</b></div>'+
     '<div><div class="mute">Total needed</div><b>'+money(totalNeed)+'</b></div>'+
     '<div><div class="mute">Total made so far</div><b class="pos">'+money(totalMade)+'</b></div>'+
-    '<div><div class="mute">Gross total</div><b>'+money(totalGross)+'</b></div>'+
-    '<div><div class="mute">Surplus</div><b class="pos">'+money(totalSurplus)+'</b></div>'+
+    '<div><div class="mute">Gross (incl. surplus)</div><b>'+money(totalGross)+'</b></div>'+
+    '<div><div class="mute">Goal needed</div><b>'+money(totalNeed)+'</b></div>'+
+    '<div><div class="mute">Remaining surplus</div><b class="pos">'+money(totalSurplus)+'</b></div>'+
     '<div><div class="mute">Goals</div><b>'+goals+'</b></div>'+
     '<div><div class="mute">Avg days left</div><b>'+avgDays+'</b></div>'+
     '</div></div>';
@@ -976,10 +980,9 @@ function combinedHtml(){
     '<div><div class="mute">Spent so far</div><b class="neg">'+money(sp)+'</b></div>'+
     '<div><div class="mute">Misc expenses</div><b class="misc">'+money(mi)+'</b></div>'+
     '<div><div class="mute">Tax deductible</div><b class="pos">'+money(tx)+'</b></div>'+
-    '<div><div class="mute">Amount needed</div><b>'+money(need)+'</b></div>'+
-    '<div><div class="mute">Gross total</div><b>'+money(gross)+'</b><div class="mute">Made + expenses</div></div>'+
-    '<div><div class="mute">Still to make</div><b>'+money(Math.max(0,need-mt))+'</b></div>'+
-    '<div><div class="mute">Surplus</div><b class="pos">'+money(surplus)+'</b></div>'+
+    '<div><div class="mute">Gross (incl. surplus)</div><b>'+money(gross)+'</b><div class="mute">Made + expenses</div></div>'+
+    '<div><div class="mute">Goal needed</div><b>'+money(need)+'</b></div>'+
+    '<div><div class="mute">Remaining surplus</div><b class="pos">'+money(surplus)+'</b></div>'+
     '<div><div class="mute">Made today</div><b class="pos">'+money(madeToday)+'</b></div></div></div>';
   h+='<div class="card"><h2>By goal</h2>'+rows+'</div>';
   if(og.length){
@@ -1027,12 +1030,12 @@ function goalHtml(){
        '<div><div class="mute">Spent so far</div><b class="neg">'+money(c.spentTotal)+'</b></div>'+
        '<div><div class="mute">Misc expenses</div><b class="misc">'+money(c.miscTotal)+'</b></div>'+
        '<div><div class="mute">Tax deductible</div><b class="pos">'+money(c.taxTotal)+'</b><div class="mute">incl. '+money(c.taxOnlyTotal)+' tax-only</div></div>'+
-       '<div><div class="mute">Amount needed</div><b>'+money(c.need)+'</b><div class="mute">'+money(g.target)+' goal + '+money(c.spentTotal+c.miscTotal)+' expenses</div></div>'+
-       '<div><div class="mute">Gross total</div><b>'+money(c.gross)+'</b><div class="mute">Made + expenses (before goal)</div></div>'+
+       '<div><div class="mute">Gross (incl. surplus)</div><b>'+money(c.gross)+'</b><div class="mute">Made + expenses</div></div>'+
+       '<div><div class="mute">Goal needed</div><b>'+money(c.need)+'</b><div class="mute">'+money(g.target)+' + expenses</div></div>'+
+       '<div><div class="mute">Remaining surplus</div><b class="pos">'+money(c.surplus)+'</b></div>'+
        '<div><div class="mute">Needed per day</div><b>'+money(c.dailyNeed)+'</b><div class="mute">'+money(c.need)+' over '+c.totalDays+' days</div></div>'+
        '<div><div class="mute">Made today</div><b class="pos">'+money(c.madeToday)+'</b><div class="mute">'+money(c.dayLeft)+' left to make today</div></div>'+
        '<div><div class="mute">Still to make</div><b>'+money(Math.max(0,c.remaining))+'</b></div>'+
-       '<div><div class="mute">Surplus</div><b class="pos">'+money(c.surplus)+'</b></div>'+
      '</div>'+
      '</div>';
     var br=bestRate(g,c);
