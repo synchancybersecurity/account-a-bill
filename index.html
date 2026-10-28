@@ -353,15 +353,15 @@ function bestRate(g,c){
   var fromLogs=hours>0?c.madeTotal/hours:0;
   var rate=0, source='none';
   if((g.wage||0)>0){rate=g.wage;source='manual wage'}
-  else if(avg.rate>0){rate=avg.rate;source=avg.mode==='baseline'?'baseline':'avg'}
+  else if(avg.rate>0){rate=avg.rate;source=avg.mode==='baseline'?'baseline':'auto avg'}
   else if(fromLogs>0){rate=fromLogs;source='logs'}
   else if((g.baselinePay||0)>0){rate=g.baselinePay;source='baseline'}
-  var hpd=(g.hoursPerDay||0)>0?g.hoursPerDay:(g.baselineHours||0);
+  var hpd=(g.hoursPerDay||0)>0?g.hoursPerDay:(avg.avgHoursPerDay||0)>0?avg.avgHoursPerDay:(g.baselineHours||0);
   return {rate:rate, source:source, hoursPerDay:hpd, avg:avg, fromLogs:fromLogs};
 }
 function avgPayPerHour(g){
   if(g.payMode==='manual' && g.baselinePay>0){
-    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline'};
+    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline', avgHoursPerDay:g.baselineHours||0};
   }
   var byDay={};
   (g.made||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].pay+=e.amount});
@@ -371,25 +371,11 @@ function avgPayPerHour(g){
     var x=byDay[d];
     if(x.hours>0 && x.pay>0){totalPay+=x.pay;totalHours+=x.hours;days++}
   });
+  var avgHpd=days>0?totalHours/days:0;
   if(days===0 && g.baselinePay>0){
-    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline'};
+    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline', avgHoursPerDay:g.baselineHours||0};
   }
-  return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours, mode:'auto'};
-}
-    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline'};
-  }
-  var byDay={};
-  (g.made||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].pay+=e.amount});
-  (g.time||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].hours+=e.hours||0});
-  var totalPay=0, totalHours=0, days=0;
-  Object.keys(byDay).forEach(function(d){
-    var x=byDay[d];
-    if(x.hours>0 && x.pay>0){totalPay+=x.pay;totalHours+=x.hours;days++}
-  });
-  if(days===0 && g.baselinePay>0){
-    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline'};
-  }
-  return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours, mode:'auto'};
+  return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours, mode:'auto', avgHoursPerDay:avgHpd};
 }
 var EITC=[{ri:.0765,max:664,ps:10860,pm:18140,ro:.0765},{ri:.34,max:4427,ps:23890,pm:31160,ro:.1598},{ri:.40,max:7316,ps:23890,pm:31160,ro:.2106},{ri:.45,max:8231,ps:23890,pm:31160,ro:.2106}];
 function addDays(sd,n){var d=parse(sd);d.setDate(d.getDate()+n);return fmtDate(d)}
