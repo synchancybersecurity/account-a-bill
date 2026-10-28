@@ -35,6 +35,8 @@ h2{font-size:17px;margin:0}
 .big{font-size:40px;font-weight:700;line-height:1.1;letter-spacing:-.02em}
 .bar{height:8px;background:var(--track);border-radius:2px;overflow:hidden;transform:skewX(-20deg)}
 .bar>i{display:block;height:100%;background:linear-gradient(90deg,#7a0a14,var(--acc),var(--acc2))}
+.cfchart{width:100%;height:120px;background:rgba(0,0,0,.25);border-radius:4px;overflow:hidden}
+.cfchart svg{width:100%;height:100%;display:block}
 button{font:inherit;border:1px solid rgba(255,255,255,.22);border-radius:3px 12px 3px 12px;padding:10px 14px;background:linear-gradient(135deg,var(--acc2),var(--acc) 60%,#9d1020);color:var(--acc-fg);font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(225,29,46,.35)}
 button:active{transform:translateY(1px)}
 button.ghost{background:rgba(255,255,255,.04);color:var(--fg);border-color:var(--line);box-shadow:none}
@@ -501,7 +503,24 @@ function paceHtml(g,c){
   return '<div class="mute">'+(diff>=0?'Ahead of pace by <b class="pos">':'Behind pace by <b class="neg">')+money(Math.abs(diff))+'</b> (day '+el+' of '+c.totalDays+')</div>';
 }
 /* Cash flow / relief-flow estimator: projects remaining need, pace scenarios, and simple what-if. */
-function cashFlowHtml(g,c){
+function cashFlowChart(g,c,daily){
+  if(!daily||daily<=0||c.daysLeft<=0)return '';
+  var days=Math.min(c.daysLeft,60);
+  var pts=[], max=0, rem=Math.max(0,c.remaining);
+  for(var i=0;i<=days;i++){
+    var left=Math.max(0,rem-daily*i);
+    pts.push(left);
+    if(left>max)max=left;
+  }
+  if(max<=0)max=1;
+  var w=300, h=100, step=w/days;
+  var d='';
+  pts.forEach(function(v,i){
+    var x=i*step, y=h-(v/max)*h;
+    d+=(i?'L':'M')+x.toFixed(1)+','+y.toFixed(1);
+  });
+  return '<div class="cfchart"><svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><path d="'+d+'" fill="none" stroke="#e11d2e" stroke-width="2"/><path d="'+d+' L'+w+','+h+' L0,'+h+' Z" fill="rgba(225,29,46,.15)"/></svg></div>';
+}
   if(isOut(g)||c.over)return '';
   var rem=Math.max(0,c.remaining), days=c.daysLeft, per=c.perDay;
   var avgSoFar=0, el=Math.min(c.totalDays,Math.max(0,daysBetween(g.start,today())+1));
@@ -518,6 +537,7 @@ function cashFlowHtml(g,c){
   var baseDaily=hourlyDaily>0?hourlyDaily:avgSoFar;
   var atPace=avgSoFar*days, shortfall=rem-atPace;
   var h='<div class="card"><h2>Cash flow estimator</h2><div class="mute">Uses calculated hourly rate, recent average, and scenarios. Rough planning tool, not a forecast.</div>'+
+    cashFlowChart(g,c,hourlyDaily>0?hourlyDaily:avgSoFar)+
     '<div class="grid">'+
     '<div><div class="mute">Still to make</div><b>'+money(rem)+'</b></div>'+
     '<div><div class="mute">Days left (incl. today)</div><b>'+days+'</b></div>'+
