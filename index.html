@@ -182,7 +182,10 @@ function render(){
 function listHtml(){
   var h='<div class="brand"><i></i><b>Account-a-Bill</b></div><h1>Goals <button class="sm" data-a="new">+ New goal</button></h1>';
   var lt=view.ltab||'goals';
-  h+='<div class="tabs"><button class="sm'+(lt==='goals'?'':' ghost')+'" data-a="ltab" data-t="goals">Goals</button><button class="sm'+(lt==='combined'?'':' ghost')+'" data-a="ltab" data-t="combined">Combined</button><button class="sm'+(lt==='monthly'?'':' ghost')+'" data-a="ltab" data-t="monthly">Monthly</button></div>';
+  h+='<div class="tabs"><button class="sm'+(lt==='goals'?'':' ghost')+'" data-a="ltab" data-t="goals">Goals</button><button class="sm'+(lt==='relief'?'':' ghost')+'" data-a="ltab" data-t="relief">Relief</button><button class="sm'+(lt==='combined'?'':' ghost')+'" data-a="ltab" data-t="combined">Combined</button><button class="sm'+(lt==='monthly'?'':' ghost')+'" data-a="ltab" data-t="monthly">Monthly</button></div>';
+  if(lt==='relief'){
+    return h+reliefListHtml();
+  }
   if(lt==='monthly'){
     return h+monthlyHtml();
   }
@@ -787,6 +790,36 @@ function monthlyHtml(){
   });
   if(filtering&&!shown)h+='<div class="card mute">No entries match.</div>';
   return h+'<div class="btns"><button class="ghost" data-a="monthCsv">Export monthly income (CSV)</button></div>';
+}
+
+function reliefListHtml(){
+  if(!state.goals.length)return '<div class="card mute">No goals yet. Add a goal to see financial projections.</div>';
+  var totalNeed=0, totalMade=0, totalRem=0, totalDays=0, goals=0;
+  var rows='';
+  state.goals.forEach(function(g){
+    if(isOut(g))return;
+    var c=calc(g);
+    goals++;
+    totalNeed+=c.need;
+    totalMade+=c.madeTotal;
+    totalRem+=Math.max(0,c.remaining);
+    totalDays+=c.daysLeft;
+    var hours=sumHours(g.time);
+    var rate=hours>0?c.madeTotal/hours:(g.wage||0);
+    rows+='<div class="item"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(Math.max(0,c.remaining))+' left · '+c.daysLeft+' days · '+(rate>0?money(rate)+'/hr':'no rate')+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
+  });
+  if(!goals)return '<div class="card mute">No incoming goals to project. Outgoing goals are excluded from relief projections.</div>';
+  var avgDays=goals?Math.round(totalDays/goals):0;
+  var h='<div class="card"><h2>Overall projections</h2><div class="mute">Combined view of remaining need across incoming goals.</div>'+
+    '<div class="grid">'+
+    '<div><div class="mute">Total still to make</div><b>'+money(totalRem)+'</b></div>'+
+    '<div><div class="mute">Total made so far</div><b class="pos">'+money(totalMade)+'</b></div>'+
+    '<div><div class="mute">Goals</div><b>'+goals+'</b></div>'+
+    '<div><div class="mute">Avg days left</div><b>'+avgDays+'</b></div>'+
+    '</div></div>';
+  h+='<div class="card"><h2>By goal</h2>'+rows+'</div>';
+  h+='<div class="mute">Open any goal and use its Relief tab for detailed hourly wage, hours-per-day, and what-if projections.</div>';
+  return h;
 }
 
 function combinedHtml(){
