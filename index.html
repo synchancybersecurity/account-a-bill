@@ -128,6 +128,8 @@ function load(){
     if(!g.time)g.time=[];
     if(g.wage==null)g.wage=0;
     if(g.hoursPerDay==null)g.hoursPerDay=0;
+    if(!g.manualPay)g.manualPay=[];
+    if(!g.payMode)g.payMode='auto';
   });
   if(!s.profile)s.profile={name:'',payer:''};
   if(!s.profile.filing)s.profile.filing='single';
@@ -346,6 +348,13 @@ function stopTimer(){
 function sumHours(arr){return (arr||[]).reduce(function(t,x){return t+(x.hours||0)},0)}
 function dayHours(g,d){var t=0;(g.time||[]).forEach(function(e){if(e.date===d)t+=e.hours||0});return t}
 function avgPayPerHour(g){
+  if(g.payMode==='manual' && g.manualPay && g.manualPay.length){
+    var totalPay=0, totalHours=0, days=0;
+    g.manualPay.forEach(function(e){
+      if(e.hours>0 && e.pay>=0){totalPay+=e.pay;totalHours+=e.hours;days++}
+    });
+    return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours, mode:'manual'};
+  }
   var byDay={};
   (g.made||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].pay+=e.amount});
   (g.time||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].hours+=e.hours||0});
@@ -354,7 +363,7 @@ function avgPayPerHour(g){
     var x=byDay[d];
     if(x.hours>0 && x.pay>0){totalPay+=x.pay;totalHours+=x.hours;days++}
   });
-  return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours};
+  return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours, mode:'auto'};
 }
 var EITC=[{ri:.0765,max:664,ps:10860,pm:18140,ro:.0765},{ri:.34,max:4427,ps:23890,pm:31160,ro:.1598},{ri:.40,max:7316,ps:23890,pm:31160,ro:.2106},{ri:.45,max:8231,ps:23890,pm:31160,ro:.2106}];
 function addDays(sd,n){var d=parse(sd);d.setDate(d.getDate()+n);return fmtDate(d)}
@@ -884,8 +893,8 @@ function goalHtml(){
   if(!g){view.page='list';return listHtml()}
   var c=calc(g),tab=view.tab||'overview';if(tab==='paystub')tab='overview';
   var h='<div class="brand noprint"><i></i><b>Account-a-Bill</b></div><p class="noprint" style="margin:4px 0 0"><a class="back" href="#" data-a="back">‹ All goals</a></p><h1 class="noprint">'+esc(g.name)+(isOut(g)?'<span class="tag" style="color:#ffb347;border-color:#ffb347">Outgoing</span>':'')+'</h1>';
-  var tabs=[['overview','Overview'],['relief','Relief'],['daily','Daily'],['made','Made'],['spent','Spent'],['misc','Misc'],['taxonly','Tax'],['history','History']];
-  if(isOut(g))tabs=[['overview','Overview'],['relief','Relief'],['daily','Daily'],['made','Payments'],['history','History']];
+  var tabs=[['overview','Overview'],['relief','Relief'],['pay','Pay'],['daily','Daily'],['made','Made'],['spent','Spent'],['misc','Misc'],['taxonly','Tax'],['history','History']];
+  if(isOut(g))tabs=[['overview','Overview'],['relief','Relief'],['pay','Pay'],['daily','Daily'],['made','Payments'],['history','History']];
   h+='<div class="tabs noprint">'+tabs.map(function(x){return '<button class="sm'+(tab===x[0]?'':' ghost')+'" data-a="tab" data-t="'+x[0]+'">'+x[1]+'</button>'}).join('')+'</div>';
   if(tab==='overview' && !isOut(g)){
     h+='<div class="card" style="padding:10px 14px"><div class="mute">Open the <b>Relief</b> tab for cash-flow projections, hourly wage, and hours-per-day estimates.</div></div>';
@@ -949,6 +958,33 @@ function goalHtml(){
     }
     h+='</div>';
     if(!isOut(g))h+=timeCardHtml(g,c);
+  }
+  else if(tab==='pay'){
+    var mode=g.payMode||'auto';
+    h+='<div class="card"><h2>Pay & hours mode</h2>'+
+      '<div class="tabs"><button class="sm'+(mode==='auto'?'':' ghost')+'" data-a="payMode" data-m="auto">Auto</button>'+
+      '<button class="sm'+(mode==='manual'?'':' ghost')+'" data-a="payMode" data-m="manual">Manual</button></div>'+
+      '<div class="mute">'+(mode==='auto'?'Using logged money made and hours.':'Using manual daily pay and hours entries.')+'</div></div>';
+    if(mode==='manual'){
+      h+='<div class="card"><h2>Add daily pay & hours</h2>'+
+        '<div class="grid"><label>Pay ($)<input id="mpPay" type="number" inputmode="decimal" step="any" placeholder="0"></label>'+
+        '<label>Hours<input id="mpHours" type="number" inputmode="decimal" step="any" placeholder="0"></label></div>'+
+        '<label>Date<input id="mpDate" type="date" value="'+today()+'"></label>'+
+        '<div><button data-a="addManualPay">Add day</button></div></div>';
+      var list=(g.manualPay||[]).slice().sort(function(a,b){return a.date<b.date?1:-1});
+      if(list.length){
+        h+='<div class="card"><h2>Manual entries</h2>';
+        list.slice(0,20).forEach(function(e){
+          var r=e.hours>0?e.pay/e.hours:0;
+          h+='<div class="item"><div><b>'+money(e.pay)+'</b> · '+e.hours.toFixed(2)+' h<div class="mute">'+esc(fmtLong(e.date))+(r>0?' · '+money(r)+'/hr':'')+'</div></div>'+
+            '<button class="danger sm" data-a="delManualPay" data-id="'+esc(e.id)+'">'+(view.armed==='mp'+e.id?'Tap to confirm':'Delete')+'</button></div>';
+        });
+        h+='</div>';
+      }
+    }else{
+      h+='<div class="card mute">Auto mode uses the money you log on the Made tab and the hours you log in the time tracker.</div>';
+      h+=timeCardHtml(g,c);
+    }
   }
   else if(tab==='daily'){
     h+=dailyHtml(g,c);
@@ -1254,6 +1290,30 @@ document.addEventListener('click',function(ev){
   }
   else if(a==='stopGps'){
     stopGpsTrip();
+  }
+  else if(a==='payMode'){
+    g.payMode=el.dataset.m||'auto';
+    save();
+    toast(g.payMode==='auto'?'Auto mode':'Manual mode');
+    render();
+  }
+  else if(a==='addManualPay'){
+    var pay=num('mpPay'), hrs=num('mpHours'), dt=val('mpDate')||today();
+    if(pay==null||pay<0||hrs==null||hrs<=0){toast('Enter pay and hours above zero.');return}
+    if(!g.manualPay)g.manualPay=[];
+    g.manualPay.push({id:uid(),date:dt,pay:pay,hours:hrs});
+    save();
+    toast('Day added');
+    render();
+  }
+  else if(a==='delManualPay'){
+    var key='mp'+el.dataset.id;
+    if(view.armed!==key){view.armed=key;render();return}
+    g.manualPay=g.manualPay.filter(function(e){return e.id!==el.dataset.id});
+    view.armed=null;
+    save();
+    toast('Entry deleted');
+    render();
   }
   else if(a==='saveWage'){
     var w=num('wageIn'), h=num('hpdIn');
