@@ -508,26 +508,43 @@ function cashFlowHtml(g,c){
   if(el>0)avgSoFar=c.madeTotal/el;
   var br=bestRate(g,c);
   var hourlyDaily=br.rate>0&&br.hoursPerDay>0?br.rate*br.hoursPerDay:0;
+  var avg7=0, days7=0;
+  for(var i=0;i<7;i++){
+    var d=addDays(today(),-i);
+    var made=dayMade(g,d);
+    if(made>0){avg7+=made;days7++}
+  }
+  if(days7>0)avg7=avg7/days7;
+  var baseDaily=hourlyDaily>0?hourlyDaily:avgSoFar;
   var atPace=avgSoFar*days, shortfall=rem-atPace;
-  var h='<div class="card"><h2>Cash flow estimator</h2><div class="mute">Uses your calculated hourly rate when available. Rough planning tool, not a forecast.</div>'+
+  var h='<div class="card"><h2>Cash flow estimator</h2><div class="mute">Uses calculated hourly rate, recent average, and scenarios. Rough planning tool, not a forecast.</div>'+
     '<div class="grid">'+
     '<div><div class="mute">Still to make</div><b>'+money(rem)+'</b></div>'+
     '<div><div class="mute">Days left (incl. today)</div><b>'+days+'</b></div>'+
     '<div><div class="mute">Required per day</div><b class="'+(per>0?'':'pos')+'">'+money(per)+'</b></div>'+
-    '<div><div class="mute">Hourly-based daily</div><b class="'+(hourlyDaily>0?'pos':'')+'">'+(hourlyDaily>0?money(hourlyDaily):'—')+'</b><div class="mute">'+(br.rate>0?money(br.rate)+'/hr × '+(br.hoursPerDay||0)+' hrs':'no rate')+'</div></div></div>';
+    '<div><div class="mute">Hourly-based daily</div><b class="'+(hourlyDaily>0?'pos':'')+'">'+(hourlyDaily>0?money(hourlyDaily):'—')+'</b><div class="mute">'+(br.rate>0?money(br.rate)+'/hr × '+(br.hoursPerDay||0)+' hrs':'no rate')+'</div></div>'+
+    '<div><div class="mute">7-day avg (days worked)</div><b>'+(days7>0?money(avg7):'—')+'</b><div class="mute">'+days7+' day'+(days7!==1?'s':'')+' with income</div></div></div>';
   if(hourlyDaily>0){
     var daysAtHourly=Math.ceil(rem/hourlyDaily);
     var shortHourly=rem-(hourlyDaily*days);
     h+='<div class="sum"><span>At calculated hourly rate</span><b class="'+(shortHourly>0?'neg':'pos')+'">'+(shortHourly>0?'short '+money(shortHourly):'surplus '+money(-shortHourly))+'</b></div>'+
       '<div class="mute">About <b>'+daysAtHourly+'</b> day'+(daysAtHourly!==1?'s':'')+' to finish remaining at '+money(hourlyDaily)+'/day.</div>';
   }
+  if(avg7>0){
+    var daysAt7=Math.ceil(rem/avg7);
+    h+='<div class="mute">At 7-day average you would need about <b>'+daysAt7+'</b> day'+(daysAt7!==1?'s':'')+'.</div>';
+  }
   h+='<div class="sum"><span>If you keep your current average</span><b class="'+(shortfall>0?'neg':'pos')+'">'+(shortfall>0?'short '+money(shortfall):'surplus '+money(-shortfall))+'</b></div>';
-  if(avgSoFar>0.01){
-    var daysAtAvg=Math.ceil(rem/avgSoFar);
-    h+='<div class="mute">At current average you would need about <b>'+daysAtAvg+'</b> day'+(daysAtAvg!==1?'s':'')+' to finish the remaining amount.</div>';
+  if(baseDaily>0){
+    h+='<h2 style="margin-top:10px">Scenarios</h2><div class="mute">Based on '+(hourlyDaily>0?'calculated hourly daily':'recent average')+'.</div><div class="grid">';
+    [0.8,1,1.2].forEach(function(m){
+      var rate=baseDaily*m, dFin=Math.ceil(rem/rate), short=rem-(rate*days);
+      h+='<div><div class="mute">'+(m*100)+'%</div><b>'+money(rate)+'/day</b><div class="mute">'+(short>0?'short '+money(short):'surplus '+money(-short))+' · '+dFin+' days</div></div>';
+    });
+    h+='</div>';
   }
   h+='<h2 style="margin-top:10px">What-if daily rate</h2><div class="mute">Override with a different daily amount.</div>'+
-    '<div class="grid"><label>Assumed $/day<input id="cfRate" type="number" inputmode="decimal" step="any" placeholder="'+(hourlyDaily>0?Math.round(hourlyDaily):Math.round(per||c.dailyNeed))+'" value="'+(view.cfRate||'')+'"></label>'+
+    '<div class="grid"><label>Assumed $/day<input id="cfRate" type="number" inputmode="decimal" step="any" placeholder="'+(baseDaily>0?Math.round(baseDaily):Math.round(per||c.dailyNeed))+'" value="'+(view.cfRate||'')+'"></label>'+
     '<div style="display:flex;align-items:flex-end"><button class="sm" data-a="cfCalc">Estimate</button></div></div>';
   if(view.cfResult){
     var r=view.cfResult;
@@ -879,6 +896,7 @@ function reliefListHtml(){
   if(!state.goals.length)return '<div class="card mute">No goals yet. Add a goal to see financial projections.</div>';
   var totalNeed=0, totalMade=0, totalRem=0, totalDays=0, goals=0;
   var rows='';
+  var by30=0, by60=0, by90=0;
   state.goals.forEach(function(g){
     if(isOut(g))return;
     var c=calc(g);
@@ -888,6 +906,12 @@ function reliefListHtml(){
     totalRem+=Math.max(0,c.remaining);
     totalDays+=c.daysLeft;
     var br=bestRate(g,c);
+    var daily=br.rate>0&&br.hoursPerDay>0?br.rate*br.hoursPerDay:0;
+    if(daily>0){
+      by30+=Math.min(c.remaining, daily*30);
+      by60+=Math.min(c.remaining, daily*60);
+      by90+=Math.min(c.remaining, daily*90);
+    }
     rows+='<div class="item"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(Math.max(0,c.remaining))+' left · '+c.daysLeft+' days · '+(br.rate>0?money(br.rate)+'/hr ('+br.source+')':'no rate')+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
   });
   if(!goals)return '<div class="card mute">No incoming goals to project. Outgoing goals are excluded from relief projections.</div>';
@@ -898,6 +922,12 @@ function reliefListHtml(){
     '<div><div class="mute">Total made so far</div><b class="pos">'+money(totalMade)+'</b></div>'+
     '<div><div class="mute">Goals</div><b>'+goals+'</b></div>'+
     '<div><div class="mute">Avg days left</div><b>'+avgDays+'</b></div>'+
+    '</div></div>';
+  h+='<div class="card"><h2>30 / 60 / 90 days</h2><div class="mute">Estimated income at calculated hourly rates, capped at each goal’s remaining amount.</div>'+
+    '<div class="grid">'+
+    '<div><div class="mute">Next 30 days</div><b class="pos">'+money(by30)+'</b></div>'+
+    '<div><div class="mute">Next 60 days</div><b class="pos">'+money(by60)+'</b></div>'+
+    '<div><div class="mute">Next 90 days</div><b class="pos">'+money(by90)+'</b></div>'+
     '</div></div>';
   h+='<div class="card"><h2>By goal</h2>'+rows+'</div>';
   h+='<div class="btns"><button class="sm" data-a="copyPlan">Copy plan to clipboard</button></div>';
