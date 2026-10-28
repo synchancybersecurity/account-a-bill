@@ -521,7 +521,7 @@ function cashFlowChart(g,c,daily){
   });
   return '<div class="cfchart"><svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><path d="'+d+'" fill="none" stroke="#e11d2e" stroke-width="2"/><path d="'+d+' L'+w+','+h+' L0,'+h+' Z" fill="rgba(225,29,46,.15)"/></svg></div>';
 }
-function cashFlowHtml(g,c){
+function cashFlowHtml(g,c){ /* fixed */
   if(isOut(g)||c.over)return '';
   var rem=Math.max(0,c.remaining), days=c.daysLeft, per=c.perDay;
   var avgSoFar=0, el=Math.min(c.totalDays,Math.max(0,daysBetween(g.start,today())+1));
