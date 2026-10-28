@@ -831,8 +831,8 @@ function goalHtml(){
   if(!g){view.page='list';return listHtml()}
   var c=calc(g),tab=view.tab||'overview';if(tab==='paystub')tab='overview';
   var h='<div class="brand noprint"><i></i><b>Account-a-Bill</b></div><p class="noprint" style="margin:4px 0 0"><a class="back" href="#" data-a="back">‹ All goals</a></p><h1 class="noprint">'+esc(g.name)+(isOut(g)?'<span class="tag" style="color:#ffb347;border-color:#ffb347">Outgoing</span>':'')+'</h1>';
-  var tabs=[['overview','Overview'],['daily','Daily'],['made','Made'],['spent','Spent'],['misc','Misc'],['taxonly','Tax'],['history','History']];
-  if(isOut(g))tabs=[['overview','Overview'],['daily','Daily'],['made','Payments'],['history','History']];
+  var tabs=[['overview','Overview'],['relief','Relief'],['daily','Daily'],['made','Made'],['spent','Spent'],['misc','Misc'],['taxonly','Tax'],['history','History']];
+  if(isOut(g))tabs=[['overview','Overview'],['relief','Relief'],['daily','Daily'],['made','Payments'],['history','History']];
   h+='<div class="tabs noprint">'+tabs.map(function(x){return '<button class="sm'+(tab===x[0]?'':' ghost')+'" data-a="tab" data-t="'+x[0]+'">'+x[1]+'</button>'}).join('')+'</div>';
 
   if(tab==='overview'){
@@ -858,6 +858,10 @@ function goalHtml(){
     h+=sectionsHtml(g,c);
     var gd=view.armed==='goal';
     h+='<div class="btns"><button class="ghost sm" data-a="edit">Edit goal</button><button class="ghost sm" data-a="dupGoal">Duplicate for next period</button><button class="danger sm" data-a="delGoal">'+(gd?'Tap to confirm delete':'Delete goal')+'</button></div>';
+  }
+  else if(tab==='relief'){
+    h+='<div class="card"><h2>Relief / Cash flow</h2><div class="mute">Estimated financial projections for this goal.</div></div>';
+    h+=cashFlowHtml(g,c);
   }
   else if(tab==='daily'){
     h+=dailyHtml(g,c);
