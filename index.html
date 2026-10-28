@@ -195,13 +195,21 @@ function listHtml(){
     if(!state.goals.length)return h+'<div class="card mute">No goals yet. Add a goal to see combined totals.</div>';
     return h+combinedHtml();
   }
-  if(!state.goals.length)h+='<div class="card mute">No goals yet. Tap “+ New goal”, enter how much you want to make and by when. Then open the goal and use the Relief tab for cash-flow projections, hourly wage, and hours-per-day estimates.</div>';
+  if(!state.goals.length){
+    h+='<div class="card mute">No goals yet. Tap “+ New goal”, enter how much you want to make and by when. Then open the goal and use the Relief and Pay tabs for projections and hourly estimates.</div>';
+  }else{
+    var totalRem=0, totalMade=0, active=0;
+    state.goals.forEach(function(g){if(isOut(g))return;var c=calc(g);if(!c.over){active++;totalRem+=Math.max(0,c.remaining);totalMade+=c.madeTotal}});
+    if(active){
+      h+='<div class="card"><div class="mute">Active goals</div><div class="big">'+active+'</div><div class="grid"><div><div class="mute">Still to make</div><b>'+money(totalRem)+'</b></div><div><div class="mute">Made so far</div><b class="pos">'+money(totalMade)+'</b></div></div></div>';
+    }
+  }
   state.goals.forEach(function(g){
     var c=calc(g);
     h+='<div class="card tap" data-a="open" data-id="'+esc(g.id)+'"><div class="row"><h2>'+esc(g.name)+(isOut(g)?'<span class="tag" style="color:#ffb347;border-color:#ffb347">Outgoing</span>':'')+'</h2><span class="mute">'+dueShort(g)+'</span></div>'+
       '<div class="row"><span class="mute">'+(isOut(g)?'Left to pay per day':'Left to make per day')+'</span><b class="'+(c.leftToday>0?'':'pos')+'">'+money(c.leftToday)+'</b></div>'+
       '<div class="bar"><i style="width:'+c.pct+'%"></i></div>'+
-      '<div class="mute">'+money(c.madeTotal)+(isOut(g)?' paid of ':' made of ')+money(c.need)+'</div><div class="mute">Due '+fmtLong(g.end)+' · set for '+c.totalDays+' day'+(c.totalDays>1?'s':'')+'</div></div>';
+      '<div class="mute">'+money(c.madeTotal)+(isOut(g)?' paid of ':' made of ')+money(c.need)+' · '+Math.round(c.pct)+'%</div></div>';
   });
   if(view.recover){
     h+='<div class="card"><h2>Saved copy found</h2><div class="mute">A backup copy of your goals was found on this device ('+view.recover.goals.length+' goal'+(view.recover.goals.length>1?'s':'')+'). Restore it?</div><div class="btns"><button class="sm" data-a="recover">Restore my goals</button></div></div>';
