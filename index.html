@@ -526,19 +526,16 @@ function cashFlowChart(g,c,daily){
   });
   return '<div class="cfchart"><svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><path d="'+d+'" fill="none" stroke="#e11d2e" stroke-width="2"/><path d="'+d+' L'+w+','+h+' L0,'+h+' Z" fill="rgba(225,29,46,.15)"/></svg></div>';
 }
-function combinedChart(gs,sel){
-  var maxDays=0, totalDaily=0, totalRem=0;
+function combinedChart(gs,sel,rate,hours){
+  var maxDays=0, totalDaily=rate>0&&hours>0?rate*hours:0, totalRem=0;
   gs.forEach(function(g){
     if(sel[g.id]===false)return;
     var c=calc(g);
-    var br=bestRate(g,c);
     if(c.daysLeft>maxDays)maxDays=c.daysLeft;
-    var hrs=br.hoursPerDay||0;
-    if(br.rate>0&&hrs>0)totalDaily+=br.rate*hrs;
     totalRem+=Math.max(0,c.remaining);
   });
   if(maxDays<=0)return '<div class="mute">No active goals selected.</div>';
-  if(totalDaily<=0)return '<div class="mute">Set a rate and hours on at least one goal to see the chart.</div>';
+  if(totalDaily<=0)return '<div class="mute">Enter a pay rate and hours above to see the chart.</div>';
   var days=Math.min(maxDays,60);
   var pts=[], max=0;
   for(var i=0;i<=days;i++){
@@ -1002,29 +999,28 @@ function reliefListHtml(){
 function combinedHtml(){
   var allG=state.goals,gs=allG.filter(function(g){return !isOut(g)}),og=allG.filter(isOut),t=0,mt=0,sp=0,mi=0,tx=0,need=0,perDay=0,madeToday=0,gross=0,surplus=0,rows='';
   var sel=view.combSel||{};
-  var active=0, totalHours=0, totalRate=0, rateCount=0, totalDaily=0;
+  var sharedRate=view.combRate||0, sharedHours=view.combHours||0;
+  var active=0, totalDaily=sharedRate>0&&sharedHours>0?sharedRate*sharedHours:0;
   gs.forEach(function(g){
     var on=sel[g.id]!==false;
     var c=calc(g);
-    var br=bestRate(g,c);
     if(on){
-      mt+=c.madeTotal;sp+=c.spentTotal;mi+=c.miscTotal;tx+=c.taxTotal;need+=c.need;madeToday+=c.madeToday;gross+=c.gross;surplus+=c.surplus;if(!c.over)perDay+=c.leftToday;
-      if(br.rate>0){totalRate+=br.rate;rateCount++}
-      if(br.hoursPerDay>0)totalHours+=br.hoursPerDay;
-      if(br.rate>0&&br.hoursPerDay>0)totalDaily+=br.rate*br.hoursPerDay;
+      mt+=c.madeTotal;sp+=c.spentTotal;mi+=c.miscTotal;tx+=c.taxTotal;need+=c.need;madeToday+=c.madeToday;
+      var proj=sharedRate>0&&sharedHours>0?c.madeTotal+(sharedRate*sharedHours*c.daysLeft):c.gross;
+      gross+=proj;surplus+=Math.max(0,proj-c.need);if(!c.over)perDay+=c.leftToday;
       active++
     }
-    rows+='<div class="item" style="flex-direction:column;align-items:stretch;gap:6px"><div style="display:flex;align-items:center;gap:8px"><label class="chk" style="flex:1"><input type="checkbox" data-a="combToggle" data-id="'+esc(g.id)+'"'+(on?' checked':'')+'> <b>'+esc(g.name)+'</b><div class="mute">'+money(c.madeTotal)+' made · '+(br.rate>0?money(br.rate)+'/hr':'no rate')+' · Gross '+money(c.gross)+(c.surplus>0?' · Surplus '+money(c.surplus):'')+'</div></label><div class="tabs"><button class="sm'+( (g.payMode||'auto')==='auto'?'':' ghost')+'" data-a="combMode" data-id="'+esc(g.id)+'" data-m="auto">Auto</button><button class="sm'+( (g.payMode||'auto')==='manual'?'':' ghost')+'" data-a="combMode" data-id="'+esc(g.id)+'" data-m="manual">Manual</button></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>'+
-      ((g.payMode||'auto')==='manual'?'<div class="grid"><label>Pay $/hr<input id="pay'+g.id+'" type="number" inputmode="decimal" step="any" placeholder="25" value="'+(g.baselinePay||'')+'"></label><label>Hours/day<input id="hrs'+g.id+'" type="number" inputmode="decimal" step="any" placeholder="6" value="'+(g.baselineHours||g.hoursPerDay||'')+'"></label><div style="display:flex;align-items:flex-end"><button class="sm" data-a="combSave" data-id="'+esc(g.id)+'">Save</button></div></div>':'<div class="grid"><label>Hours/day<input id="hrs'+g.id+'" type="number" inputmode="decimal" step="any" placeholder="hrs" value="'+(g.hoursPerDay||'')+'" data-a="combHours" data-id="'+esc(g.id)+'"></label></div>')+
-      '</div>';
+    rows+='<div class="item"><label class="chk" style="flex:1"><input type="checkbox" data-a="combToggle" data-id="'+esc(g.id)+'"'+(on?' checked':'')+'> <b>'+esc(g.name)+'</b><div class="mute">'+money(c.madeTotal)+' made · '+c.daysLeft+' days · Gross '+money(c.gross)+(c.surplus>0?' · Surplus '+money(c.surplus):'')+'</div></label><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
   });
-  var avgRate=rateCount>0?totalRate/rateCount:0;
   var totalRem=0;
   gs.forEach(function(g){if(sel[g.id]!==false){var c=calc(g);totalRem+=Math.max(0,c.remaining)}});
   var daysToGoal=totalDaily>0?Math.ceil(totalRem/totalDaily):0;
   var pct=need>0?Math.min(100,Math.max(0,mt/need*100)):0;
-  var h='<div class="card"><h2>Combined cash flow</h2><div class="mute">Projected remaining across selected goals at their calculated rates.</div>'+
-    combinedChart(gs,sel)+
+  var h='<div class="card"><h2>Combined cash flow</h2><div class="mute">One rate and hours applied to all selected goals.</div>'+
+    '<div class="grid"><label>Pay $/hr<input id="combPay" type="number" inputmode="decimal" step="any" placeholder="25" value="'+(sharedRate||'')+'"></label>'+
+    '<label>Hours/day<input id="combHrs" type="number" inputmode="decimal" step="any" placeholder="6" value="'+(sharedHours||'')+'"></label>'+
+    '<div style="display:flex;align-items:flex-end"><button class="sm" data-a="combApply">Apply</button></div></div>'+
+    combinedChart(gs,sel,sharedRate,sharedHours)+
     (daysToGoal>0?'<div class="sum"><span>Projected days to achieve</span><b class="pos">'+daysToGoal+' day'+(daysToGoal!==1?'s':'')+'</b></div>':'')+
     '<div class="mute">Left to make per day, selected goals</div><div class="big '+(perDay>0?'':'pos')+'">'+money(perDay)+'</div>'+
     '<div class="mute">'+active+' of '+gs.length+' goal'+(gs.length===1?'':'s')+' selected</div><div class="bar"><i style="width:'+pct+'%"></i></div>'+
@@ -1036,9 +1032,7 @@ function combinedHtml(){
     '<div><div class="mute">Gross</div><b>'+money(gross)+'</b><div class="mute">Total that will be made</div></div>'+
     '<div><div class="mute">Goal needed</div><b>'+money(need)+'</b></div>'+
     '<div><div class="mute">Surplus</div><b class="pos">'+money(surplus)+'</b><div class="mute">After goal</div></div>'+
-    '<div><div class="mute">Avg hourly rate</div><b class="'+(avgRate>0?'pos':'')+'">'+(avgRate>0?money(avgRate)+'/hr':'—')+'</b></div>'+
-    '<div><div class="mute">Total hours/day</div><b>'+(totalHours>0?totalHours.toFixed(1):'—')+'</b></div>'+
-    '<div><div class="mute">Projected daily</div><b class="'+(totalDaily>0?'pos':'')+'">'+(totalDaily>0?money(totalDaily):'—')+'</b><div class="mute">Sum of rate × hours</div></div>'+
+    '<div><div class="mute">Projected daily</div><b class="'+(totalDaily>0?'pos':'')+'">'+(totalDaily>0?money(totalDaily):'—')+'</b><div class="mute">'+money(sharedRate)+'/hr × '+sharedHours+' hrs</div></div>'+
     '<div><div class="mute">Days to achieve</div><b class="'+(daysToGoal>0?'pos':'')+'">'+(daysToGoal>0?daysToGoal:'—')+'</b></div>'+
     '<div><div class="mute">Made today</div><b class="pos">'+money(madeToday)+'</b></div></div></div>';
   h+='<div class="card"><h2>Select goals</h2><div class="mute">Uncheck to exclude from the combined totals.</div>'+rows+'</div>';
@@ -1659,27 +1653,11 @@ document.addEventListener('click',function(ev){
     view.combSel[el.dataset.id]=el.checked;
     render();
   }
-  else if(a==='combHours'){
-    var g=find(el.dataset.id);
-    if(g){
-      var hrs=num('hrs'+el.dataset.id);
-      g.hoursPerDay=hrs!=null&&hrs>0?hrs:0;
-      save();
-      render();
-    }
-  }
-  else if(a==='combMode'){
-    var g=find(el.dataset.id);
-    if(g){g.payMode=el.dataset.m||'auto';save();render();}
-  }
-  else if(a==='combSave'){
-    var g=find(el.dataset.id);
-    if(g){
-      var pay=num('pay'+el.dataset.id), hrs=num('hrs'+el.dataset.id);
-      if(pay!=null&&pay>0)g.baselinePay=pay;
-      if(hrs!=null&&hrs>0){g.baselineHours=hrs;g.hoursPerDay=hrs}
-      save();render();toast('Saved');
-    }
+  else if(a==='combApply'){
+    var pay=num('combPay'), hrs=num('combHrs');
+    view.combRate=pay!=null&&pay>0?pay:0;
+    view.combHours=hrs!=null&&hrs>0?hrs:0;
+    render();
   }
   else if(a==='addSavings'){
     var name=val('svName').trim(), target=num('svTarget');
