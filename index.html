@@ -818,6 +818,7 @@ function reliefListHtml(){
     '<div><div class="mute">Avg days left</div><b>'+avgDays+'</b></div>'+
     '</div></div>';
   h+='<div class="card"><h2>By goal</h2>'+rows+'</div>';
+  h+='<div class="btns"><button class="sm" data-a="copyPlan">Copy plan to clipboard</button></div>';
   h+='<div class="mute">Open any goal and use its Relief tab for detailed hourly wage, hours-per-day, and what-if projections.</div>';
   return h;
 }
@@ -1340,6 +1341,32 @@ document.addEventListener('click',function(ev){
     if(qt==='spent'||qt==='misc')qe.tax=document.getElementById('qTax').checked;
     if(qt==='taxonly')qe.tax=true;
     qg[qt].push(qe);save();var yq2=window.scrollY;render();window.scrollTo(0,yq2);toast('Entry added to '+qg.name);
+  }
+  else if(a==='copyPlan'){
+    var text='Account-a-Bill Relief Plan\n';
+    text+='Generated: '+new Date().toLocaleString()+'\n\n';
+    var totalRem=0, totalMade=0, goals=0;
+    state.goals.forEach(function(g){
+      if(isOut(g))return;
+      var c=calc(g);
+      goals++;
+      totalRem+=Math.max(0,c.remaining);
+      totalMade+=c.madeTotal;
+      var hours=sumHours(g.time);
+      var rate=hours>0?c.madeTotal/hours:(g.wage||0);
+      text+=g.name+'\n';
+      text+='  Still to make: '+money(Math.max(0,c.remaining))+'\n';
+      text+='  Days left: '+c.daysLeft+'\n';
+      text+='  Rate: '+(rate>0?money(rate)+'/hr':'not set')+'\n';
+      if(g.hoursPerDay)text+='  Hours/day: '+g.hoursPerDay+'\n';
+      text+='\n';
+    });
+    text+='TOTAL still to make: '+money(totalRem)+'\n';
+    text+='TOTAL made so far: '+money(totalMade)+'\n';
+    text+='Goals: '+goals+'\n';
+    try{
+      navigator.clipboard.writeText(text).then(function(){toast('Plan copied to clipboard')},function(){toast('Could not copy. Select and copy manually.')});
+    }catch(e){toast('Could not copy on this device.')}
   }
   else if(a==='ltab'){view.ltab=el.dataset.t;render()}
   else if(a==='tab'){view.tab=el.dataset.t;view.armed=null;view.editing=null;render()}
