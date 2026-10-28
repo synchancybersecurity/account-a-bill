@@ -344,6 +344,18 @@ function stopTimer(){
   if(view.page==='goal')render();
 }
 function sumHours(arr){return (arr||[]).reduce(function(t,x){return t+(x.hours||0)},0)}
+function dayHours(g,d){var t=0;(g.time||[]).forEach(function(e){if(e.date===d)t+=e.hours||0});return t}
+function avgPayPerHour(g){
+  var byDay={};
+  (g.made||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].pay+=e.amount});
+  (g.time||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].hours+=e.hours||0});
+  var totalPay=0, totalHours=0, days=0;
+  Object.keys(byDay).forEach(function(d){
+    var x=byDay[d];
+    if(x.hours>0 && x.pay>0){totalPay+=x.pay;totalHours+=x.hours;days++}
+  });
+  return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours};
+}
 var EITC=[{ri:.0765,max:664,ps:10860,pm:18140,ro:.0765},{ri:.34,max:4427,ps:23890,pm:31160,ro:.1598},{ri:.40,max:7316,ps:23890,pm:31160,ro:.2106},{ri:.45,max:8231,ps:23890,pm:31160,ro:.2106}];
 function addDays(sd,n){var d=parse(sd);d.setDate(d.getDate()+n);return fmtDate(d)}
 function dueInfo(bal){
@@ -597,6 +609,7 @@ function payCardHtml(g){
 }
 function timeCardHtml(g,c){
   var hours=sumHours(g.time), rate=hours>0?c.madeTotal/hours:0;
+  var avg=avgPayPerHour(g);
   var todayH=0;g.time.forEach(function(e){if(e.date===today())todayH+=e.hours||0});
   var running=timer&&timer.gid===g.id;
   var h='<div class="card"><h2>Time tracker</h2><div class="mute">Log hours worked to estimate effective pay per hour. Rate uses money made so far divided by total hours logged for this goal.</div>';
@@ -614,8 +627,12 @@ function timeCardHtml(g,c){
   h+='<div class="grid" style="margin-top:10px">'+
     '<div><div class="mute">Total hours</div><b>'+hours.toFixed(2)+'</b></div>'+
     '<div><div class="mute">Today</div><b>'+todayH.toFixed(2)+' h</b></div>'+
-    '<div><div class="mute">Effective $/hr</div><b class="'+(rate>0?'pos':'')+'">'+(hours>0?money(rate):'—')+'</b></div>'+
-    '<div><div class="mute">Made so far</div><b class="pos">'+money(c.madeTotal)+'</b></div></div>';
+    '<div><div class="mute">Overall $/hr</div><b class="'+(rate>0?'pos':'')+'">'+(hours>0?money(rate):'—')+'</b></div>'+
+    '<div><div class="mute">Avg $/hr (daily)</div><b class="'+(avg.rate>0?'pos':'')+'">'+(avg.days>0?money(avg.rate):'—')+'</b></div>'+
+    '</div>';
+  if(avg.days>0){
+    h+='<div class="mute">Average based on '+avg.days+' day'+(avg.days!==1?'s':'')+' where both pay and hours were logged. Matched: '+money(avg.totalPay)+' over '+avg.totalHours.toFixed(2)+' h.</div>';
+  }
   h+='<h2 style="margin-top:10px">Log hours manually</h2>'+
     '<div class="grid"><label>Hours<input id="tmHours" type="number" inputmode="decimal" step="any" placeholder="0"></label><label>Date<input id="tmDate" type="date" value="'+today()+'"></label></div>'+
     '<label>Note (optional)<input id="tmNote" placeholder="e.g. client work, drive time"></label>'+
