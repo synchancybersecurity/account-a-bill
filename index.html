@@ -918,6 +918,19 @@ function goalHtml(){
        '<div><div class="mute">Still to make</div><b>'+money(Math.max(0,c.remaining))+'</b></div>'+
      '</div>'+
      '</div>';
+    var avg=avgPayPerHour(g);
+    var hours=sumHours(g.time);
+    var effectiveRate=hours>0?c.madeTotal/hours:0;
+    var useRate=(g.wage||0)>0?g.wage:avg.rate||effectiveRate;
+    h+='<div class="card"><h2>Hourly wage</h2>'+
+      '<div class="grid">'+
+      '<div><div class="mute">Avg $/hr</div><b class="'+(avg.rate>0?'pos':'')+'">'+(avg.days>0?money(avg.rate):'—')+'</b><div class="mute">'+(avg.mode==='manual'?'Manual':'Auto')+' · '+avg.days+' day'+(avg.days!==1?'s':'')+'</div></div>'+
+      '<div><div class="mute">Overall $/hr</div><b class="'+(effectiveRate>0?'pos':'')+'">'+(hours>0?money(effectiveRate):'—')+'</b></div>'+
+      '<div><div class="mute">Manual wage</div><b>'+(g.wage?money(g.wage):'—')+'</b></div>'+
+      '<div><div class="mute">Hours needed</div><b>'+(useRate>0?(Math.max(0,c.remaining)/useRate).toFixed(1)+' h':'—')+'</b></div>'+
+      '</div>'+
+      '<div class="mute">Open the <b>Pay</b> tab to switch Auto/Manual or edit wage and hours.</div>'+
+      '</div>';
     h+=cashFlowHtml(g,c);
     if(!isOut(g))h+=timeCardHtml(g,c);
     h+=sectionsHtml(g,c);
