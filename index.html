@@ -348,8 +348,8 @@ function stopTimer(){
 function sumHours(arr){return (arr||[]).reduce(function(t,x){return t+(x.hours||0)},0)}
 function dayHours(g,d){var t=0;(g.time||[]).forEach(function(e){if(e.date===d)t+=e.hours||0});return t}
 function avgPayPerHour(g){
-  if(g.payMode==='manual' && g.baselinePay && g.baselineHours>0){
-    return {rate:g.baselinePay/g.baselineHours, days:1, totalPay:g.baselinePay, totalHours:g.baselineHours, mode:'baseline'};
+  if(g.payMode==='manual' && g.baselinePay>0){
+    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline'};
   }
   var byDay={};
   (g.made||[]).forEach(function(e){if(!byDay[e.date])byDay[e.date]={pay:0,hours:0};byDay[e.date].pay+=e.amount});
@@ -359,8 +359,8 @@ function avgPayPerHour(g){
     var x=byDay[d];
     if(x.hours>0 && x.pay>0){totalPay+=x.pay;totalHours+=x.hours;days++}
   });
-  if(days===0 && g.baselinePay && g.baselineHours>0){
-    return {rate:g.baselinePay/g.baselineHours, days:1, totalPay:g.baselinePay, totalHours:g.baselineHours, mode:'baseline'};
+  if(days===0 && g.baselinePay>0){
+    return {rate:g.baselinePay, days:1, totalPay:g.baselinePay*(g.baselineHours||0), totalHours:g.baselineHours||0, mode:'baseline'};
   }
   return {rate:totalHours>0?totalPay/totalHours:0, days:days, totalPay:totalPay, totalHours:totalHours, mode:'auto'};
 }
@@ -978,13 +978,14 @@ function goalHtml(){
       '<button class="sm'+(mode==='manual'?'':' ghost')+'" data-a="payMode" data-m="manual">Manual</button></div>'+
       '<div class="mute">'+(mode==='auto'?'Using logged money made and hours. Falls back to baseline if none.':'Baseline pay and hours used for estimates when no auto data exists.')+'</div></div>';
     if(mode==='manual'){
-      h+='<div class="card"><h2>Baseline estimate</h2><div class="mute">Used when there is no logged pay or hours for automatic calculation.</div>'+
-        '<div class="grid"><label>Pay ($)<input id="mpPay" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(g.baselinePay||'')+'"></label>'+
-        '<label>Hours<input id="mpHours" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(g.baselineHours||'')+'"></label></div>'+
+      h+='<div class="card"><h2>Baseline estimate</h2><div class="mute">Money made per hour and estimated hours worked per day. Used when there is no logged data for automatic calculation.</div>'+
+        '<div class="grid"><label>Money made per hour ($)<input id="mpPay" type="number" inputmode="decimal" step="any" placeholder="e.g. 25" value="'+(g.baselinePay||'')+'"></label>'+
+        '<label>Estimated hours per day<input id="mpHours" type="number" inputmode="decimal" step="any" placeholder="e.g. 6" value="'+(g.baselineHours||'')+'"></label></div>'+
         '<div><button data-a="saveBaseline">Save baseline</button></div>';
       if(g.baselinePay && g.baselineHours){
-        var br=g.baselineHours>0?g.baselinePay/g.baselineHours:0;
-        h+='<div class="sum"><span>Baseline rate</span><b class="pos">'+money(br)+'/hr</b></div>';
+        var daily=g.baselinePay*g.baselineHours;
+        h+='<div class="sum"><span>Estimated daily pay</span><b class="pos">'+money(daily)+'</b></div>'+
+          '<div class="mute">At '+money(g.baselinePay)+'/hr × '+g.baselineHours+' hrs/day</div>';
       }
       h+='</div>';
     }else{
