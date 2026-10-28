@@ -973,13 +973,21 @@ function reliefListHtml(){
 function combinedHtml(){
   var allG=state.goals,gs=allG.filter(function(g){return !isOut(g)}),og=allG.filter(isOut),t=0,mt=0,sp=0,mi=0,tx=0,need=0,perDay=0,madeToday=0,gross=0,surplus=0,rows='';
   var sel=view.combSel||{};
-  var active=0;
+  var active=0, totalHours=0, totalRate=0, rateCount=0, totalDaily=0;
   gs.forEach(function(g){
     var on=sel[g.id]!==false;
     var c=calc(g);
-    if(on){mt+=c.madeTotal;sp+=c.spentTotal;mi+=c.miscTotal;tx+=c.taxTotal;need+=c.need;madeToday+=c.madeToday;gross+=c.gross;surplus+=c.surplus;if(!c.over)perDay+=c.leftToday;active++}
-    rows+='<div class="item"><label class="chk" style="flex:1"><input type="checkbox" data-a="combToggle" data-id="'+esc(g.id)+'"'+(on?' checked':'')+'> <b>'+esc(g.name)+'</b><div class="mute">'+money(c.madeTotal)+' made of '+money(c.need)+' · '+dueShort(g)+(c.surplus>0?' · surplus '+money(c.surplus):'')+'</div></label><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
+    var br=bestRate(g,c);
+    if(on){
+      mt+=c.madeTotal;sp+=c.spentTotal;mi+=c.miscTotal;tx+=c.taxTotal;need+=c.need;madeToday+=c.madeToday;gross+=c.gross;surplus+=c.surplus;if(!c.over)perDay+=c.leftToday;
+      if(br.rate>0){totalRate+=br.rate;rateCount++}
+      if(br.hoursPerDay>0)totalHours+=br.hoursPerDay;
+      if(br.rate>0&&br.hoursPerDay>0)totalDaily+=br.rate*br.hoursPerDay;
+      active++
+    }
+    rows+='<div class="item"><label class="chk" style="flex:1"><input type="checkbox" data-a="combToggle" data-id="'+esc(g.id)+'"'+(on?' checked':'')+'> <b>'+esc(g.name)+'</b><div class="mute">'+money(c.madeTotal)+' made · '+(br.rate>0?money(br.rate)+'/hr × '+(br.hoursPerDay||0)+' hrs':'no rate')+' · Gross '+money(c.gross)+(c.surplus>0?' · Surplus '+money(c.surplus):'')+'</div></label><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
   });
+  var avgRate=rateCount>0?totalRate/rateCount:0;
   var pct=need>0?Math.min(100,Math.max(0,mt/need*100)):0;
   var h='<div class="card"><div class="mute">Left to make per day, selected goals</div><div class="big '+(perDay>0?'':'pos')+'">'+money(perDay)+'</div>'+
     '<div class="mute">'+active+' of '+gs.length+' goal'+(gs.length===1?'':'s')+' selected</div><div class="bar"><i style="width:'+pct+'%"></i></div>'+
@@ -991,6 +999,9 @@ function combinedHtml(){
     '<div><div class="mute">Gross</div><b>'+money(gross)+'</b><div class="mute">Total that will be made</div></div>'+
     '<div><div class="mute">Goal needed</div><b>'+money(need)+'</b></div>'+
     '<div><div class="mute">Surplus</div><b class="pos">'+money(surplus)+'</b><div class="mute">After goal</div></div>'+
+    '<div><div class="mute">Avg hourly rate</div><b class="'+(avgRate>0?'pos':'')+'">'+(avgRate>0?money(avgRate)+'/hr':'—')+'</b></div>'+
+    '<div><div class="mute">Total hours/day</div><b>'+(totalHours>0?totalHours.toFixed(1):'—')+'</b></div>'+
+    '<div><div class="mute">Projected daily</div><b class="'+(totalDaily>0?'pos':'')+'">'+(totalDaily>0?money(totalDaily):'—')+'</b><div class="mute">Sum of rate × hours</div></div>'+
     '<div><div class="mute">Made today</div><b class="pos">'+money(madeToday)+'</b></div></div></div>';
   h+='<div class="card"><h2>Select goals</h2><div class="mute">Uncheck to exclude from the combined totals.</div>'+rows+'</div>';
   if(og.length){
