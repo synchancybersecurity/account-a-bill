@@ -506,20 +506,28 @@ function cashFlowHtml(g,c){
   var rem=Math.max(0,c.remaining), days=c.daysLeft, per=c.perDay;
   var avgSoFar=0, el=Math.min(c.totalDays,Math.max(0,daysBetween(g.start,today())+1));
   if(el>0)avgSoFar=c.madeTotal/el;
+  var br=bestRate(g,c);
+  var hourlyDaily=br.rate>0&&br.hoursPerDay>0?br.rate*br.hoursPerDay:0;
   var atPace=avgSoFar*days, shortfall=rem-atPace;
-  var h='<div class="card"><h2>Cash flow estimator</h2><div class="mute">Projects what you still need and how different daily rates affect finishing on time. Rough planning tool, not a forecast.</div>'+
+  var h='<div class="card"><h2>Cash flow estimator</h2><div class="mute">Uses your calculated hourly rate when available. Rough planning tool, not a forecast.</div>'+
     '<div class="grid">'+
     '<div><div class="mute">Still to make</div><b>'+money(rem)+'</b></div>'+
     '<div><div class="mute">Days left (incl. today)</div><b>'+days+'</b></div>'+
     '<div><div class="mute">Required per day</div><b class="'+(per>0?'':'pos')+'">'+money(per)+'</b></div>'+
-    '<div><div class="mute">Your avg so far / day</div><b class="'+(avgSoFar>=c.dailyNeed?'pos':'neg')+'">'+money(avgSoFar)+'</b></div></div>';
+    '<div><div class="mute">Hourly-based daily</div><b class="'+(hourlyDaily>0?'pos':'')+'">'+(hourlyDaily>0?money(hourlyDaily):'—')+'</b><div class="mute">'+(br.rate>0?money(br.rate)+'/hr × '+(br.hoursPerDay||0)+' hrs':'no rate')+'</div></div></div>';
+  if(hourlyDaily>0){
+    var daysAtHourly=Math.ceil(rem/hourlyDaily);
+    var shortHourly=rem-(hourlyDaily*days);
+    h+='<div class="sum"><span>At calculated hourly rate</span><b class="'+(shortHourly>0?'neg':'pos')+'">'+(shortHourly>0?'short '+money(shortHourly):'surplus '+money(-shortHourly))+'</b></div>'+
+      '<div class="mute">About <b>'+daysAtHourly+'</b> day'+(daysAtHourly!==1?'s':'')+' to finish remaining at '+money(hourlyDaily)+'/day.</div>';
+  }
   h+='<div class="sum"><span>If you keep your current average</span><b class="'+(shortfall>0?'neg':'pos')+'">'+(shortfall>0?'short '+money(shortfall):'surplus '+money(-shortfall))+'</b></div>';
   if(avgSoFar>0.01){
     var daysAtAvg=Math.ceil(rem/avgSoFar);
     h+='<div class="mute">At current average you would need about <b>'+daysAtAvg+'</b> day'+(daysAtAvg!==1?'s':'')+' to finish the remaining amount.</div>';
   }
-  h+='<h2 style="margin-top:10px">What-if daily rate</h2><div class="mute">Enter a daily make amount to see projected finish.</div>'+
-    '<div class="grid"><label>Assumed $/day<input id="cfRate" type="number" inputmode="decimal" step="any" placeholder="'+Math.round(per||c.dailyNeed)+'" value="'+(view.cfRate||'')+'"></label>'+
+  h+='<h2 style="margin-top:10px">What-if daily rate</h2><div class="mute">Override with a different daily amount.</div>'+
+    '<div class="grid"><label>Assumed $/day<input id="cfRate" type="number" inputmode="decimal" step="any" placeholder="'+(hourlyDaily>0?Math.round(hourlyDaily):Math.round(per||c.dailyNeed))+'" value="'+(view.cfRate||'')+'"></label>'+
     '<div style="display:flex;align-items:flex-end"><button class="sm" data-a="cfCalc">Estimate</button></div></div>';
   if(view.cfResult){
     var r=view.cfResult;
