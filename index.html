@@ -972,13 +972,17 @@ function reliefListHtml(){
 
 function combinedHtml(){
   var allG=state.goals,gs=allG.filter(function(g){return !isOut(g)}),og=allG.filter(isOut),t=0,mt=0,sp=0,mi=0,tx=0,need=0,perDay=0,madeToday=0,gross=0,surplus=0,rows='';
+  var sel=view.combSel||{};
+  var active=0;
   gs.forEach(function(g){
-    var c=calc(g);mt+=c.madeTotal;sp+=c.spentTotal;mi+=c.miscTotal;tx+=c.taxTotal;need+=c.need;madeToday+=c.madeToday;gross+=c.gross;surplus+=c.surplus;if(!c.over)perDay+=c.leftToday;
-    rows+='<div class="item"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(c.madeTotal)+' made of '+money(c.need)+' · '+dueShort(g)+(c.surplus>0?' · surplus '+money(c.surplus):'')+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
+    var on=sel[g.id]!==false;
+    var c=calc(g);
+    if(on){mt+=c.madeTotal;sp+=c.spentTotal;mi+=c.miscTotal;tx+=c.taxTotal;need+=c.need;madeToday+=c.madeToday;gross+=c.gross;surplus+=c.surplus;if(!c.over)perDay+=c.leftToday;active++}
+    rows+='<div class="item"><label class="chk" style="flex:1"><input type="checkbox" data-a="combToggle" data-id="'+esc(g.id)+'"'+(on?' checked':'')+'> <b>'+esc(g.name)+'</b><div class="mute">'+money(c.madeTotal)+' made of '+money(c.need)+' · '+dueShort(g)+(c.surplus>0?' · surplus '+money(c.surplus):'')+'</div></label><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
   });
   var pct=need>0?Math.min(100,Math.max(0,mt/need*100)):0;
-  var h='<div class="card"><div class="mute">Left to make per day, all goals</div><div class="big '+(perDay>0?'':'pos')+'">'+money(perDay)+'</div>'+
-    '<div class="mute">'+gs.length+' goal'+(gs.length===1?'':'s')+' combined</div><div class="bar"><i style="width:'+pct+'%"></i></div>'+
+  var h='<div class="card"><div class="mute">Left to make per day, selected goals</div><div class="big '+(perDay>0?'':'pos')+'">'+money(perDay)+'</div>'+
+    '<div class="mute">'+active+' of '+gs.length+' goal'+(gs.length===1?'':'s')+' selected</div><div class="bar"><i style="width:'+pct+'%"></i></div>'+
     '<div class="grid">'+
     '<div><div class="mute">Made so far</div><b class="pos">'+money(mt)+'</b></div>'+
     '<div><div class="mute">Spent so far</div><b class="neg">'+money(sp)+'</b></div>'+
@@ -988,7 +992,7 @@ function combinedHtml(){
     '<div><div class="mute">Goal needed</div><b>'+money(need)+'</b></div>'+
     '<div><div class="mute">Surplus</div><b class="pos">'+money(surplus)+'</b><div class="mute">After goal</div></div>'+
     '<div><div class="mute">Made today</div><b class="pos">'+money(madeToday)+'</b></div></div></div>';
-  h+='<div class="card"><h2>By goal</h2>'+rows+'</div>';
+  h+='<div class="card"><h2>Select goals</h2><div class="mute">Uncheck to exclude from the combined totals.</div>'+rows+'</div>';
   if(og.length){
     var oP=0,oN=0,oD=0,orows='';
     og.forEach(function(g){var c=calc(g);oP+=c.madeTotal;oN+=c.need;if(!c.over)oD+=c.leftToday;orows+='<div class="item k-s"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(c.madeTotal)+' paid of '+money(c.need)+' · '+dueShort(g)+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>'});
@@ -1600,6 +1604,11 @@ document.addEventListener('click',function(ev){
     var text=lines.join('\n');
     if(navigator.share){navigator.share({title:'Account-a-Bill',text:text}).catch(function(){})}
     else{try{navigator.clipboard.writeText(text).then(function(){toast('Summary copied')})}catch(e){toast('Could not share')}}
+  }
+  else if(a==='combToggle'){
+    if(!view.combSel)view.combSel={};
+    view.combSel[el.dataset.id]=el.checked;
+    render();
   }
   else if(a==='addSavings'){
     var name=val('svName').trim(), target=num('svTarget');
