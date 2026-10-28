@@ -174,6 +174,7 @@ function calc(g){
   var perDay=Math.max(0,(need-madeTotal)/daysLeft);
   var dayLeft=Math.max(0,Math.max(0,(need-(madeTotal-madeToday))/daysLeft)-madeToday);
   return {dayLeft:dayLeft,taxOnlyTotal:taxOnlyTotal,taxTotal:taxTotal,madeTotal:madeTotal,spentTotal:spentTotal,miscTotal:miscTotal,madeToday:madeToday,need:need,remaining:need-madeTotal,
+    surplus:Math.max(0,madeTotal-need),gross:madeTotal+spentTotal+miscTotal,
     daysLeft:daysLeft,totalDays:totalDays,dailyNeed:need/totalDays,perDay:perDay,leftToday:perDay,
     pct:need>0?Math.min(100,Math.max(0,madeTotal/need*100)):0,over:daysBetween(t,g.end)<0};
 }
@@ -215,7 +216,7 @@ function listHtml(){
     h+='<div class="card tap" data-a="open" data-id="'+esc(g.id)+'"><div class="row"><h2>'+esc(g.name)+(isOut(g)?'<span class="tag" style="color:#ffb347;border-color:#ffb347">Outgoing</span>':'')+'</h2><span class="mute">'+dueShort(g)+'</span></div>'+
       '<div class="row"><span class="mute">'+(isOut(g)?'Left to pay per day':'Left to make per day')+'</span><b class="'+(c.leftToday>0?'':'pos')+'">'+money(c.leftToday)+'</b></div>'+
       '<div class="bar"><i style="width:'+c.pct+'%"></i></div>'+
-      '<div class="mute">'+money(c.madeTotal)+(isOut(g)?' paid of ':' made of ')+money(c.need)+' · '+Math.round(c.pct)+'%</div></div>';
+      '<div class="mute">'+money(c.madeTotal)+(isOut(g)?' paid of ':' made of ')+money(c.need)+' · '+Math.round(c.pct)+'%'+(c.surplus>0?' · surplus '+money(c.surplus):'')+'</div></div>';
   });
   if(view.recover){
     h+='<div class="card"><h2>Saved copy found</h2><div class="mute">A backup copy of your goals was found on this device ('+view.recover.goals.length+' goal'+(view.recover.goals.length>1?'s':'')+'). Restore it?</div><div class="btns"><button class="sm" data-a="recover">Restore my goals</button></div></div>';
@@ -915,7 +916,7 @@ function savingsHtml(){
 
 function reliefListHtml(){
   if(!state.goals.length)return '<div class="card mute">No goals yet. Add a goal to see financial projections.</div>';
-  var totalNeed=0, totalMade=0, totalRem=0, totalDays=0, goals=0;
+  var totalNeed=0, totalMade=0, totalRem=0, totalDays=0, goals=0, totalGross=0, totalSurplus=0;
   var rows='';
   var by30=0, by60=0, by90=0;
   state.goals.forEach(function(g){
@@ -925,6 +926,8 @@ function reliefListHtml(){
     totalNeed+=c.need;
     totalMade+=c.madeTotal;
     totalRem+=Math.max(0,c.remaining);
+    totalGross+=c.gross;
+    totalSurplus+=c.surplus;
     totalDays+=c.daysLeft;
     var br=bestRate(g,c);
     var daily=br.rate>0&&br.hoursPerDay>0?br.rate*br.hoursPerDay:0;
@@ -933,14 +936,17 @@ function reliefListHtml(){
       by60+=Math.min(c.remaining, daily*60);
       by90+=Math.min(c.remaining, daily*90);
     }
-    rows+='<div class="item"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(Math.max(0,c.remaining))+' left · '+c.daysLeft+' days · '+(br.rate>0?money(br.rate)+'/hr ('+br.source+')':'no rate')+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
+    rows+='<div class="item"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(Math.max(0,c.remaining))+' left · '+money(c.need)+' needed · '+(c.surplus>0?'surplus '+money(c.surplus)+' · ':'')+c.daysLeft+' days · '+(br.rate>0?money(br.rate)+'/hr ('+br.source+')':'no rate')+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
   });
   if(!goals)return '<div class="card mute">No incoming goals to project. Outgoing goals are excluded from relief projections.</div>';
   var avgDays=goals?Math.round(totalDays/goals):0;
   var h='<div class="card"><h2>Overall projections</h2><div class="mute">Combined view of remaining need across incoming goals.</div>'+
     '<div class="grid">'+
     '<div><div class="mute">Total still to make</div><b>'+money(totalRem)+'</b></div>'+
+    '<div><div class="mute">Total needed</div><b>'+money(totalNeed)+'</b></div>'+
     '<div><div class="mute">Total made so far</div><b class="pos">'+money(totalMade)+'</b></div>'+
+    '<div><div class="mute">Gross total</div><b>'+money(totalGross)+'</b></div>'+
+    '<div><div class="mute">Surplus</div><b class="pos">'+money(totalSurplus)+'</b></div>'+
     '<div><div class="mute">Goals</div><b>'+goals+'</b></div>'+
     '<div><div class="mute">Avg days left</div><b>'+avgDays+'</b></div>'+
     '</div></div>';
@@ -957,10 +963,10 @@ function reliefListHtml(){
 }
 
 function combinedHtml(){
-  var allG=state.goals,gs=allG.filter(function(g){return !isOut(g)}),og=allG.filter(isOut),t=0,mt=0,sp=0,mi=0,tx=0,need=0,perDay=0,madeToday=0,rows='';
+  var allG=state.goals,gs=allG.filter(function(g){return !isOut(g)}),og=allG.filter(isOut),t=0,mt=0,sp=0,mi=0,tx=0,need=0,perDay=0,madeToday=0,gross=0,surplus=0,rows='';
   gs.forEach(function(g){
-    var c=calc(g);mt+=c.madeTotal;sp+=c.spentTotal;mi+=c.miscTotal;tx+=c.taxTotal;need+=c.need;madeToday+=c.madeToday;if(!c.over)perDay+=c.leftToday;
-    rows+='<div class="item"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(c.madeTotal)+' made of '+money(c.need)+' · '+dueShort(g)+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
+    var c=calc(g);mt+=c.madeTotal;sp+=c.spentTotal;mi+=c.miscTotal;tx+=c.taxTotal;need+=c.need;madeToday+=c.madeToday;gross+=c.gross;surplus+=c.surplus;if(!c.over)perDay+=c.leftToday;
+    rows+='<div class="item"><div><b>'+esc(g.name)+'</b><div class="mute">'+money(c.madeTotal)+' made of '+money(c.need)+' · '+dueShort(g)+(c.surplus>0?' · surplus '+money(c.surplus):'')+'</div></div><button class="ghost sm" data-a="open" data-id="'+esc(g.id)+'">Open</button></div>';
   });
   var pct=need>0?Math.min(100,Math.max(0,mt/need*100)):0;
   var h='<div class="card"><div class="mute">Left to make per day, all goals</div><div class="big '+(perDay>0?'':'pos')+'">'+money(perDay)+'</div>'+
@@ -971,7 +977,9 @@ function combinedHtml(){
     '<div><div class="mute">Misc expenses</div><b class="misc">'+money(mi)+'</b></div>'+
     '<div><div class="mute">Tax deductible</div><b class="pos">'+money(tx)+'</b></div>'+
     '<div><div class="mute">Amount needed</div><b>'+money(need)+'</b></div>'+
+    '<div><div class="mute">Gross total</div><b>'+money(gross)+'</b><div class="mute">Made + expenses</div></div>'+
     '<div><div class="mute">Still to make</div><b>'+money(Math.max(0,need-mt))+'</b></div>'+
+    '<div><div class="mute">Surplus</div><b class="pos">'+money(surplus)+'</b></div>'+
     '<div><div class="mute">Made today</div><b class="pos">'+money(madeToday)+'</b></div></div></div>';
   h+='<div class="card"><h2>By goal</h2>'+rows+'</div>';
   if(og.length){
@@ -1020,9 +1028,11 @@ function goalHtml(){
        '<div><div class="mute">Misc expenses</div><b class="misc">'+money(c.miscTotal)+'</b></div>'+
        '<div><div class="mute">Tax deductible</div><b class="pos">'+money(c.taxTotal)+'</b><div class="mute">incl. '+money(c.taxOnlyTotal)+' tax-only</div></div>'+
        '<div><div class="mute">Amount needed</div><b>'+money(c.need)+'</b><div class="mute">'+money(g.target)+' goal + '+money(c.spentTotal+c.miscTotal)+' expenses</div></div>'+
+       '<div><div class="mute">Gross total</div><b>'+money(c.gross)+'</b><div class="mute">Made + expenses (before goal)</div></div>'+
        '<div><div class="mute">Needed per day</div><b>'+money(c.dailyNeed)+'</b><div class="mute">'+money(c.need)+' over '+c.totalDays+' days</div></div>'+
        '<div><div class="mute">Made today</div><b class="pos">'+money(c.madeToday)+'</b><div class="mute">'+money(c.dayLeft)+' left to make today</div></div>'+
        '<div><div class="mute">Still to make</div><b>'+money(Math.max(0,c.remaining))+'</b></div>'+
+       '<div><div class="mute">Surplus</div><b class="pos">'+money(c.surplus)+'</b></div>'+
      '</div>'+
      '</div>';
     var br=bestRate(g,c);
